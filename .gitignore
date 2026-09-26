@@ -1,0 +1,30 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+aicad_debug.log
+
+# IDE / Editor
+.vscode/
+.obsidian/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Report
+report.txt

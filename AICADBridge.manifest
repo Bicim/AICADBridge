@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "id": "c7a8b64e-2849-411a-9fa8-aicadbridge01",
+  "author": "Yunus Ayyildiz",
+  "description": {
+    "": "Fusion 360 AI CAD Studio MVP - Doğal dil ile 3D modelleme asistanı"
+  },
+  "version": "1.0.0",
+  "runOnStartup": false,
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

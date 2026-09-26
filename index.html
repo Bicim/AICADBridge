@@ -1,0 +1,3654 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI CAD Studio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg-app: #0a0a0a;
+      --bg-sidebar: #0f0f0f;
+      --bg-input: #1a1a1a;
+      --bg-hover: #1e1e1e;
+      --border: #1e1e1e;
+      --border-input: #2a2a2a;
+      --accent: #00b8d4;
+      --accent-dim: rgba(0,184,212,0.15);
+      --text-1: #e8e8e8;
+      --text-2: #888;
+      --text-3: #555;
+      --success: #4ec9b0;
+      --warning: #e5c07b;
+      --error: #f48771;
+      --font: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html,body { height:100%; overflow:hidden; }
+
+    body {
+      background:var(--bg-app); color:var(--text-1);
+      font-family:var(--font); font-size:14px;
+      display:flex; flex-direction:column;
+    }
+
+    /* ── Layout ── */
+    .layout { display:flex; height:100%; }
+
+    /* ── Sidebar & Conversation History ── */
+    .sidebar {
+      width:52px; min-width:52px; background:var(--bg-sidebar);
+      border-right:1px solid var(--border);
+      display:flex; flex-direction:column; align-items:center;
+      padding:14px 0; gap:6px;
+      transition: width .25s cubic-bezier(0.4,0,0.2,1);
+      position: relative; z-index: 10;
+      overflow: hidden;
+    }
+    .sidebar.expanded {
+      width: 220px; min-width: 220px; align-items: flex-start;
+      padding: 14px 10px;
+    }
+
+    .sidebar-btn {
+      width:36px; height:36px; border-radius:10px; border:none;
+      background:transparent; color:var(--text-2); cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:all .15s; position:relative; flex-shrink: 0;
+    }
+    .sidebar.expanded .sidebar-btn { width: 100%; justify-content: flex-start; gap: 10px; padding: 0 8px; }
+    .sidebar-btn:hover { background:var(--bg-input); color:var(--text-1); }
+    .sidebar-btn.active { background:var(--accent-dim); color:var(--accent); }
+    .sidebar-btn svg { width:18px; height:18px; flex-shrink:0; }
+    .sidebar-spacer { flex:1; }
+    .sidebar-btn .tip {
+      display:none; position:absolute; left:48px; background:#222;
+      color:#ddd; padding:4px 10px; border-radius:6px;
+      font-size:11px; white-space:nowrap; z-index:100; pointer-events:none;
+    }
+    .sidebar-btn:hover .tip { display:block; }
+    .sidebar.expanded .sidebar-btn .tip { display:none !important; }
+    .sidebar-btn .btn-label { display: none; font-size: 12px; font-weight: 500; white-space: nowrap; }
+    .sidebar.expanded .sidebar-btn .btn-label { display: block; }
+
+    /* Conversation list */
+    .conv-section { display: none; flex-direction: column; width: 100%; min-width: 0; gap: 2px; }
+    .sidebar.expanded .conv-section { display: flex; }
+    .conv-section-title {
+      font-size: 10px; font-weight: 700; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .6px;
+      padding: 8px 4px 4px; flex-shrink: 0;
+    }
+    .conv-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: 320px; }
+    .conv-list::-webkit-scrollbar { width: 3px; }
+    .conv-list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    .conv-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border-radius: 8px; cursor: pointer;
+      border: 1px solid transparent; transition: all .15s; min-width: 0;
+    }
+    .conv-item:hover { background: var(--bg-hover); }
+    .conv-item.active { background: var(--accent-dim); border-color: rgba(0,184,212,.3); }
+    .conv-item-icon { font-size: 12px; flex-shrink: 0; }
+    .conv-item-name {
+      font-size: 11.5px; color: var(--text-1); overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+    }
+    .conv-item.active .conv-item-name { color: var(--accent); }
+    .conv-item-del {
+      background: transparent; border: none; color: var(--text-3);
+      cursor: pointer; font-size: 14px; padding: 0 2px; opacity: 0;
+      transition: opacity .15s; line-height: 1;
+    }
+    .conv-item:hover .conv-item-del { opacity: 1; }
+    .conv-item-del:hover { color: var(--error); }
+
+    /* ── Thinking Mode Toggle ── */
+    .thinking-toggle {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 10px;
+      background: var(--bg-input); border: 1px solid var(--border-input);
+      cursor: pointer; transition: all .15s; margin-bottom: 10px;
+      user-select: none;
+    }
+    .thinking-toggle:hover { border-color: rgba(0,184,212,.4); }
+    .thinking-toggle.active {
+      background: rgba(0,184,212,.1); border-color: rgba(0,184,212,.4);
+    }
+    .thinking-icon { font-size: 16px; }
+    .thinking-label { flex: 1; }
+    .thinking-label-title { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
+    .thinking-label-sub { font-size: 10.5px; color: var(--text-2); margin-top: 1px; }
+    .toggle-switch {
+      width: 32px; height: 18px; border-radius: 9px;
+      background: #333; position: relative;
+      transition: background .2s; flex-shrink: 0;
+    }
+    .toggle-switch::after {
+      content: ''; position: absolute; width: 12px; height: 12px;
+      border-radius: 50%; background: #fff; top: 3px; left: 3px;
+      transition: transform .2s;
+    }
+    .thinking-toggle.active .toggle-switch { background: var(--accent); }
+    .thinking-toggle.active .toggle-switch::after { transform: translateX(14px); }
+
+    /* ── Model Category Badges ── */
+    .model-cat-badge {
+      font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: .4px; margin-left: auto;
+    }
+    .model-cat-badge.powerful { background: rgba(139,92,246,.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,.3); }
+    .model-cat-badge.fast { background: rgba(16,185,129,.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,.3); }
+    .model-cat-badge.local { background: rgba(245,158,11,.15); color: #fcd34d; border: 1px solid rgba(245,158,11,.3); }
+    .model-cat-badge.free { background: rgba(236,72,153,.15); color: #f9a8d4; border: 1px solid rgba(236,72,153,.3); }
+    .model-cat-group-header {
+      font-size: 9.5px; font-weight: 700; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: .6px;
+      padding: 8px 4px 3px; border-top: 1px solid var(--border); margin-top: 4px;
+    }
+    .model-cat-group-header:first-child { border-top: none; margin-top: 0; padding-top: 3px; }
+
+    /* ── Parametric Mode ── */
+    .param-panel {
+      display: none; flex-direction: column; height: 100%; overflow-y: auto;
+    }
+    .param-panel.active { display: flex; }
+    .param-panel::-webkit-scrollbar { width: 4px; }
+    .param-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    .param-header {
+      padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .param-header h3 { font-size: 14px; font-weight: 700; color: var(--text-1); margin-bottom: 3px; }
+    .param-header p { font-size: 12px; color: var(--text-2); }
+    .param-content { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+    .param-input-row {
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+    .param-input-row textarea {
+      flex: 1; background: var(--bg-input); border: 1px solid var(--border-input);
+      color: var(--text-1); font-family: var(--font); font-size: 13px;
+      border-radius: 10px; padding: 10px 12px; outline: none; resize: none;
+      min-height: 80px; transition: border-color .2s;
+    }
+    .param-input-row textarea:focus { border-color: var(--accent); }
+    .btn-param-gen {
+      padding: 10px 16px; border-radius: 10px; border: none;
+      background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-param-gen:hover { background: #00cce6; box-shadow: 0 4px 16px rgba(0,184,212,.4); }
+    .btn-param-gen:disabled { opacity: .4; cursor: not-allowed; }
+    .param-sliders { display: flex; flex-direction: column; gap: 12px; }
+    .param-slider-group {
+      background: var(--bg-input); border: 1px solid var(--border-input);
+      border-radius: 12px; padding: 12px 14px;
+    }
+    .param-slider-label {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .param-slider-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
+    .param-slider-val {
+      font-size: 12px; font-weight: 700; color: var(--accent);
+      background: rgba(0,184,212,.1); padding: 2px 8px; border-radius: 6px;
+    }
+    .param-slider-input {
+      width: 100%; -webkit-appearance: none; height: 4px;
+      border-radius: 2px; background: #2a2a2a; outline: none;
+      cursor: pointer; transition: background .15s;
+    }
+    .param-slider-input::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--accent);
+      box-shadow: 0 2px 8px rgba(0,184,212,.4); cursor: pointer;
+    }
+    .param-preview-area {
+      background: var(--bg-input); border: 1px solid var(--border-input);
+      border-radius: 12px; padding: 14px; min-height: 120px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); font-size: 12.5px; text-align: center;
+    }
+    .param-status { font-size: 12px; font-weight: 500; color: var(--text-2); }
+    .param-status.running { color: var(--accent); }
+    .param-status.success { color: var(--success); }
+    .param-status.error { color: var(--error); }
+
+    /* ── View Mode Tabs (Chat / Parametric) ── */
+    .view-tabs {
+      display: flex; gap: 0; background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .view-tab {
+      flex: 1; padding: 9px 12px; border: none; background: transparent;
+      color: var(--text-2); font-size: 12.5px; font-weight: 600;
+      cursor: pointer; transition: all .15s; display: flex;
+      align-items: center; justify-content: center; gap: 6px;
+      font-family: var(--font); border-bottom: 2px solid transparent;
+    }
+    .view-tab:hover { color: var(--text-1); }
+    .view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .main-panel { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+    /* ── Top bar ── */
+    .topbar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 18px; border-bottom:1px solid var(--border);
+      background:var(--bg-sidebar);
+    }
+    .topbar-brand { display:flex; align-items:center; gap:8px; }
+    .brand-icon {
+      width:26px; height:26px;
+      background:linear-gradient(135deg,#00b8d4,#0098ff);
+      border-radius:7px; display:flex; align-items:center;
+      justify-content:center; box-shadow:0 2px 10px rgba(0,184,212,.35);
+    }
+    .brand-icon svg { width:15px; height:15px; fill:#fff; }
+    .brand-name {
+      font-size:16px; font-weight:700; letter-spacing:-.3px;
+      background:linear-gradient(90deg,#00b8d4,#0098ff);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+
+    /* ── Chat ── */
+    .chat-area {
+      flex:1; overflow-y:auto; padding:20px 18px;
+      display:flex; flex-direction:column;
+    }
+    .chat-area::-webkit-scrollbar { width:4px; }
+    .chat-area::-webkit-scrollbar-track { background:transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
+
+    .welcome {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      text-align:center; gap:6px;
+    }
+    .welcome.hidden { display:none; }
+    .welcome-greeting { font-size:22px; font-weight:700; color:#fff; margin-bottom:2px; }
+    .welcome-sub { font-size:13px; color:var(--text-2); max-width:300px; line-height:1.5; }
+
+    .quick-actions {
+      display:flex; flex-wrap:wrap; justify-content:center;
+      gap:8px; margin-top:18px; max-width:360px;
+    }
+    .quick-chip {
+      background:var(--bg-input); border:1px solid var(--border-input);
+      color:var(--text-2); font-size:12px; padding:8px 14px;
+      border-radius:20px; cursor:pointer; transition:all .2s; line-height:1.3;
+    }
+    .quick-chip:hover {
+      background:var(--accent-dim); border-color:var(--accent);
+      color:var(--accent); transform:translateY(-1px);
+    }
+
+    .messages { display:flex; flex-direction:column; gap:16px; }
+    .msg { display:flex; gap:10px; animation:msgIn .3s ease-out; }
+    @keyframes msgIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    .msg-avatar {
+      width:30px; height:30px; min-width:30px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:600; flex-shrink:0; margin-top:2px;
+    }
+    .msg-avatar.ai { background:linear-gradient(135deg,#00b8d4,#0077cc); color:#fff; }
+    .msg-avatar.user { background:#2a4a6e; color:#b0cfee; }
+
+    .msg-body { flex:1; min-width:0; }
+    .msg-name { font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:4px; }
+    .msg-content { font-size:13.5px; line-height:1.55; color:var(--text-1); word-wrap:break-word; }
+
+    .status-badge {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:6px 12px; border-radius:8px; font-size:12px; font-weight:500; margin-top:4px;
+    }
+    .status-badge.loading { background:rgba(0,184,212,.12); color:#00b8d4; border:1px solid rgba(0,184,212,.25); }
+    .status-badge.healing { background:rgba(229,192,123,.12); color:#e5c07b; border:1px solid rgba(229,192,123,.25); }
+    .status-badge.success { background:rgba(78,201,176,.12); color:#4ec9b0; border:1px solid rgba(78,201,176,.25); }
+    .status-badge.error { background:rgba(244,71,71,.12); color:#f48771; border:1px solid rgba(244,71,71,.25); }
+
+    .typing-dots { display:inline-flex; gap:4px; align-items:center; height:20px; }
+    .typing-dots span {
+      width:6px; height:6px; background:var(--accent);
+      border-radius:50%; animation:blink 1.4s infinite both;
+    }
+    .typing-dots span:nth-child(2) { animation-delay:.2s; }
+    .typing-dots span:nth-child(3) { animation-delay:.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:.3;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
+
+    /* ── Input bar ── */
+    .input-bar-wrapper { padding:12px 18px 16px; background:var(--bg-app); }
+    .input-bar {
+      display:flex; align-items:flex-end;
+      background:var(--bg-input); border:1px solid var(--border-input);
+      border-radius:16px; padding:6px 6px 6px 16px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .input-bar:focus-within {
+      border-color:rgba(0,184,212,.5);
+      box-shadow:0 0 0 3px rgba(0,184,212,.1);
+    }
+    .input-bar textarea {
+      flex:1; background:transparent; border:none; outline:none;
+      color:var(--text-1); font-family:var(--font); font-size:13.5px;
+      resize:none; max-height:120px; min-height:22px; line-height:1.45; padding:7px 0;
+    }
+    .input-bar textarea::placeholder { color:var(--text-3); }
+
+    .btn-send {
+      width:34px; height:34px; border-radius:10px; border:none;
+      background:var(--accent); color:#fff; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:all .15s; flex-shrink:0;
+    }
+    .btn-send:hover:not(:disabled) { background:#00cce6; box-shadow:0 2px 10px rgba(0,184,212,.4); }
+    .btn-send:disabled { opacity:.35; cursor:not-allowed; }
+    .btn-send svg { width:16px; height:16px; }
+
+    /* Image Attachment & Preview */
+    .btn-attach {
+      width:34px; height:34px; border-radius:10px; border:none;
+      background:transparent; color:var(--text-2); cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:all .15s; flex-shrink:0; margin-right:4px;
+    }
+    .btn-attach:hover { background:var(--bg-hover); color:var(--accent); }
+    .btn-attach svg { width:17px; height:17px; }
+
+    .image-preview-tray {
+      display:flex; align-items:center; margin-bottom:8px; animation:msgIn .2s ease-out;
+    }
+    .image-preview-card {
+      display:flex; align-items:center; gap:8px;
+      background:#141c28; border:1px solid rgba(0,184,212,.35);
+      border-radius:10px; padding:5px 8px; max-width:100%;
+    }
+    .image-preview-thumb {
+      width:34px; height:34px; border-radius:6px; object-fit:cover;
+      border:1px solid rgba(255,255,255,0.1); flex-shrink:0;
+    }
+    .image-preview-info {
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    .image-preview-name {
+      font-size:11.5px; font-weight:500; color:#fff;
+      max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .image-preview-tag {
+      font-size:9.5px; color:var(--accent); font-weight:600; text-transform:uppercase;
+    }
+    .btn-remove-image {
+      background:transparent; border:none; color:var(--text-3);
+      cursor:pointer; padding:2px 6px; font-size:12px; border-radius:4px; line-height:1;
+      transition:color .15s;
+    }
+    .btn-remove-image:hover { color:#f44336; background:rgba(244,67,54,0.1); }
+
+    .msg-attached-img {
+      max-width:100%; max-height:180px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.15); display:block; object-fit:contain;
+      background:#000; margin-bottom:6px;
+    }
+
+    /* Code Preview & Markdown */
+    .code-preview-container {
+      margin-top:8px; border:1px solid #232a35; border-radius:8px;
+      overflow:hidden; background:#0c1017;
+    }
+    .code-preview-header {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:7px 12px; font-size:11.5px; font-weight:500; color:#7d8590;
+      cursor:pointer; background:#131720; transition:background .15s, color .15s;
+      user-select:none;
+    }
+    .code-preview-header:hover { color:#58a6ff; background:#1a202c; }
+    .code-toggle-arrow { font-size:10px; }
+    .code-preview-body {
+      margin:0; padding:10px 12px; font-family:'Consolas','Courier New',monospace;
+      font-size:11.5px; line-height:1.45; color:#c9d1d9; overflow-x:auto;
+      max-height:240px; border-top:1px solid #1e2430;
+    }
+
+    .msg-content p { margin:4px 0; }
+    .msg-content ul, .msg-content ol { margin:6px 0; padding-left:18px; }
+    .msg-content li { margin-bottom:3px; }
+    .msg-content strong { color:#fff; font-weight:600; }
+    .msg-content code {
+      background:rgba(255,255,255,0.08); padding:2px 5px; border-radius:4px;
+      font-family:monospace; font-size:12px; color:#00e5ff;
+    }
+
+    .bottom-row { display:flex; align-items:center; padding:6px 4px 0; }
+    .model-selector {
+      display:flex; align-items:center; gap:6px;
+      background:transparent; border:none; color:var(--text-2);
+      font-family:var(--font); font-size:11.5px; cursor:pointer;
+      padding:4px 8px; border-radius:6px; transition:all .15s;
+    }
+    .model-selector:hover { background:var(--bg-input); color:var(--text-1); }
+    .model-selector svg { width:12px; height:12px; }
+
+    /* ── Settings overlay ── */
+    .overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.65);
+      display:none; align-items:center; justify-content:center;
+      z-index:200;
+    }
+    .overlay.visible { display:flex; }
+
+    .panel {
+      background:#111; border:1px solid #252525; border-radius:14px;
+      width:430px; max-width:95vw; max-height:88vh; overflow-y:auto;
+      padding:22px; animation:slideUp .25s ease-out;
+    }
+    @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .panel::-webkit-scrollbar { width:4px; }
+    .panel::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
+
+    .panel-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:16px;
+    }
+    .panel-title { font-size:15px; font-weight:700; }
+    .panel-close {
+      background:transparent; border:none; color:var(--text-2);
+      cursor:pointer; font-size:20px; line-height:1; padding:0;
+    }
+    .panel-close:hover { color:var(--text-1); }
+
+    /* Source Mode Switcher */
+    .source-mode-switch {
+      display: flex; background: #181c24; border: 1px solid #262f3f;
+      border-radius: 10px; padding: 3px; gap: 4px; margin-bottom: 16px;
+    }
+    .source-mode-btn {
+      flex: 1; padding: 8px 10px; border-radius: 7px; border: none;
+      background: transparent; color: #8c97ab; font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all .18s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-family: var(--font);
+    }
+    .source-mode-btn:hover { color: #fff; background: rgba(255,255,255,0.04); }
+    .source-mode-btn.active {
+      background: #00b8d4; color: #0c1017; font-weight: 700;
+      box-shadow: 0 2px 10px rgba(0,184,212,0.3);
+    }
+
+    /* Local Presets */
+    .local-presets {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .local-chip {
+      background: #181d26; border: 1px solid #263042; color: #9aa5b9;
+      font-size: 11.5px; font-weight: 500; border-radius: 7px; padding: 5px 10px;
+      cursor: pointer; transition: all .15s; font-family: var(--font);
+    }
+    .local-chip:hover {
+      border-color: #00b8d4; color: #00e5ff; background: rgba(0,184,212,0.08);
+    }
+    .local-chip.active {
+      border-color: #00b8d4; color: #00e5ff; background: rgba(0,184,212,0.14);
+    }
+
+    /* Local Action Buttons */
+    .btn-test-local {
+      flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2e3a4e;
+      background: #1c2433; color: #c9d5e8; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s; font-family: var(--font);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-test-local:hover {
+      background: #253146; color: #fff; border-color: #455776;
+    }
+    .btn-save-local {
+      flex: 1; padding: 10px 12px; border-radius: 8px; border: none;
+      background: var(--accent); color: #0c1017; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all .15s; font-family: var(--font);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      box-shadow: 0 2px 12px rgba(0,184,212,0.25);
+    }
+    .btn-save-local:hover { background: #00cce6; transform: translateY(-1px); }
+
+    /* Local Status Box */
+    .local-status-box {
+      margin-top: 12px; padding: 11px 13px; border-radius: 8px;
+      font-size: 12px; line-height: 1.45; animation: fadeIn .2s ease;
+    }
+    .local-status-box.success {
+      background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.35); color: #2ecc71;
+    }
+    .local-status-box.error {
+      background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.35); color: #ff6b6b;
+    }
+    .local-status-box.testing {
+      background: rgba(0,184,212,0.1); border: 1px solid rgba(0,184,212,0.3); color: #00e5ff;
+    }
+
+    /* Local Help Card */
+    .local-help-card {
+      margin-top: 15px; padding: 12px 14px; border-radius: 10px;
+      background: #141923; border: 1px solid #232b3d; font-size: 12px;
+      color: #94a3b8; line-height: 1.5;
+    }
+    .local-help-title {
+      font-weight: 700; color: #e2e8f0; margin-bottom: 6px; font-size: 12.5px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* Provider list */
+    .provider-list { display:flex; flex-direction:column; gap:4px; margin-bottom:18px; }
+    .provider-item {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:10px; cursor:pointer;
+      border:1px solid transparent; transition:all .15s;
+    }
+    .provider-item:hover { background:var(--bg-hover); }
+    .provider-item.selected { background:rgba(0,184,212,.1); border-color:rgba(0,184,212,.3); }
+    .provider-icon {
+      width:28px; height:28px; border-radius:6px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:700; flex-shrink:0;
+    }
+    .provider-name { font-size:13.5px; font-weight:500; }
+    .provider-tag {
+      margin-left:auto; font-size:10px; color:var(--text-3);
+      background:var(--bg-input); padding:2px 7px; border-radius:4px;
+    }
+
+    /* Settings form */
+    .s-group { margin-bottom:14px; }
+    .s-label {
+      font-size:10.5px; font-weight:600; color:var(--text-2);
+      text-transform:uppercase; letter-spacing:.5px; margin-bottom:5px;
+    }
+    .s-control {
+      width:100%; background:var(--bg-input); color:var(--text-1);
+      border:1px solid var(--border-input); border-radius:8px;
+      padding:9px 12px; font-size:13px; font-family:var(--font); outline:none;
+      transition:border-color .2s;
+    }
+    .s-control:focus { border-color:var(--accent); }
+    select.s-control {
+      cursor:pointer; appearance:none;
+      background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat:no-repeat; background-position:right 10px center; background-size:14px; padding-right:30px;
+    }
+    select.s-control option { background:#1a1a1a; color:var(--text-1); }
+
+    .s-row { display:flex; gap:6px; }
+    .s-row .s-control { flex:1; }
+
+    .btn-connect {
+      padding:9px 16px; border-radius:8px; border:none;
+      background:var(--accent); color:#fff; font-size:12px;
+      font-weight:600; cursor:pointer; white-space:nowrap; transition:background .15s;
+    }
+    .btn-connect:hover { background:#00cce6; }
+    .btn-connect:disabled { opacity:.5; cursor:not-allowed; }
+
+    .s-hint { font-size:10.5px; color:var(--text-3); margin-top:4px; }
+    .s-hint.ok { color:var(--success); }
+    .s-hint.err { color:var(--error); }
+
+    .model-status {
+      padding:10px 12px; border-radius:8px;
+      font-size:12px; color:var(--text-2);
+      background:var(--bg-input); text-align:center;
+      margin-top:4px;
+    }
+
+    /* ── Connect Fusion Modal & Topbar Pill ── */
+    .btn-connect-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 12px; border-radius: 20px; font-size: 11.5px;
+      font-weight: 600; cursor: pointer; border: 1px solid transparent;
+      transition: all .2s; font-family: var(--font); background: transparent;
+      user-select: none;
+    }
+    .btn-connect-pill.connected {
+      background: rgba(78,201,176,0.12); color: #4ec9b0;
+      border-color: rgba(78,201,176,0.3);
+    }
+    .btn-connect-pill.connected:hover {
+      background: rgba(78,201,176,0.2);
+    }
+    .btn-connect-pill.disconnected {
+      background: rgba(244,135,113,0.12); color: #f48771;
+      border-color: rgba(244,135,113,0.35);
+    }
+    .btn-connect-pill.disconnected:hover {
+      background: rgba(244,135,113,0.22);
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor; display: inline-block;
+    }
+    .btn-connect-pill.connected .status-dot {
+      box-shadow: 0 0 8px #4ec9b0;
+    }
+    .btn-connect-pill.disconnected .status-dot {
+      animation: pulseDot 1.6s infinite;
+      box-shadow: 0 0 8px #f48771;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .connect-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(8px); display: none; align-items: center;
+      justify-content: center; z-index: 300; padding: 20px;
+    }
+    .connect-overlay.visible { display: flex; }
+
+    .connect-modal {
+      background: #14171f; border: 1px solid #232a3b;
+      border-radius: 20px; width: 530px; max-width: 95vw;
+      max-height: 88vh; overflow-y: auto; padding: 22px 22px 18px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.06);
+      animation: modalPop .25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalPop {
+      from { transform: scale(0.95) translateY(12px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .connect-modal::-webkit-scrollbar { width: 5px; }
+    .connect-modal::-webkit-scrollbar-thumb { background: #2a3344; border-radius: 4px; }
+
+    .connect-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .connect-title {
+      font-size: 19px; font-weight: 700; color: #fff; letter-spacing: -0.4px;
+    }
+    .connect-subtitle {
+      font-size: 12.5px; color: #8c97ab; margin-top: 3px; line-height: 1.4;
+    }
+    .connect-close-btn {
+      background: #1e2433; border: 1px solid #2e384d; color: #9aa5b9;
+      width: 30px; height: 30px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; cursor: pointer;
+      font-size: 14px; transition: all .15s; flex-shrink: 0;
+    }
+    .connect-close-btn:hover { color: #fff; background: #2b3447; border-color: #43506d; }
+
+    .connect-steps {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .step-card {
+      background: #181c26; border: 1px solid #242a38; border-radius: 13px;
+      padding: 12px 14px; display: flex; gap: 12px; transition: border-color .2s;
+    }
+    .step-card:hover { border-color: #353e54; }
+
+    .step-badge {
+      width: 24px; height: 24px; min-width: 24px; border-radius: 50%;
+      background: #232a3a; color: #c3cbdb; font-size: 11.5px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+
+    .step-content { flex: 1; min-width: 0; }
+    .step-title { font-size: 13.5px; font-weight: 600; color: #fff; margin-bottom: 3px; }
+    .step-desc { font-size: 12px; color: #8e9aae; line-height: 1.4; }
+
+    .btn-download-win {
+      width: 100%; display: flex; align-items: center; justify-content: center;
+      gap: 10px; background: #e6edf5; color: #0c1017; font-size: 13px;
+      font-weight: 600; border: none; border-radius: 9px; padding: 10px 16px;
+      cursor: pointer; margin-top: 8px; transition: all .2s;
+    }
+    .btn-download-win:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(255,255,255,0.15); }
+    .btn-download-win svg { width: 16px; height: 16px; fill: currentColor; }
+
+    .step-link {
+      display: block; text-align: center; font-size: 11px; color: #7f8ca3;
+      margin-top: 6px; text-decoration: none;
+    }
+    .step-link span { text-decoration: underline; color: #9fb3cc; cursor: pointer; }
+
+    /* Ribbon mockup */
+    .ribbon-mockup-wrapper {
+      margin-top: 10px; background: #eef1f5; border-radius: 10px;
+      padding: 8px 10px; display: flex; align-items: center;
+      justify-content: center; gap: 8px; overflow-x: auto;
+      border: 1px solid #d0d7e2;
+    }
+    .ribbon-item {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 4px 10px; border-radius: 6px; font-size: 10px;
+      font-weight: 700; color: #495057; text-align: center;
+      user-select: none;
+    }
+    .ribbon-item svg { width: 20px; height: 20px; margin-bottom: 2px; }
+    .ribbon-item.promoted {
+      background: #ffffff; border: 1.5px solid #00b8d4;
+      border-radius: 8px; box-shadow: 0 3px 12px rgba(0,184,212,0.3); color: #008ba3;
+    }
+    .ribbon-item.promoted .cad-icon-gem {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: linear-gradient(135deg, #00b8d4, #0077ff);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 12px; font-weight: 700; margin-bottom: 2px;
+      box-shadow: 0 2px 6px rgba(0,184,212,0.4);
+    }
+
+    /* Dual mode preview cards */
+    .dual-preview-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;
+    }
+    .dual-card {
+      background: #11141c; border: 1px solid #232a38; border-radius: 10px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .dual-card-graphic {
+      height: 92px; background: #090c12; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      border-bottom: 1px solid #1c2230; padding: 6px;
+    }
+    .dual-card-label {
+      padding: 6px; text-align: center; font-size: 11.5px;
+      font-weight: 600; color: #a4b1c7;
+    }
+
+    .connect-footer {
+      margin-top: 16px; padding-top: 12px; border-top: 1px solid #212735;
+      font-size: 12px; color: #7f8ca3; line-height: 1.5;
+    }
+    .connect-footer kbd {
+      background: #202636; border: 1px solid #323d54; border-radius: 4px;
+      padding: 2px 6px; font-size: 11px; color: #fff; font-family: monospace;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .modal-status-box {
+      margin-top: 14px; padding: 10px 14px; border-radius: 10px;
+      font-size: 12px; display: flex; align-items: center; justify-content: space-between;
+      gap: 10px;
+    }
+    .modal-status-box.connected {
+      background: rgba(78,201,176,0.1); border: 1px solid rgba(78,201,176,0.3); color: #4ec9b0;
+    }
+    .modal-status-box.disconnected {
+      background: rgba(244,135,113,0.1); border: 1px solid rgba(244,135,113,0.3); color: #f48771;
+    }
+    .btn-test-bridge {
+      padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08); color: #fff; font-size: 11px;
+      cursor: pointer; white-space: nowrap; transition: background .15s;
+    }
+    .btn-test-bridge:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar" id="mainSidebar">
+      <!-- Toggle button -->
+      <button class="sidebar-btn" onclick="toggleSidebar()" title="Konuşma Geçmişi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><line x1="14" y1="7" x2="21" y2="7"/><line x1="14" y1="12" x2="21" y2="12"/><line x1="14" y1="17" x2="19" y2="17"/></svg>
+        <span class="tip">Konuşmalar</span>
+        <span class="btn-label">Konuşmalar</span>
+      </button>
+
+      <!-- New Chat -->
+      <button class="sidebar-btn" onclick="startNewChat()" id="btnNewChat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span class="tip">Yeni Konuşma</span>
+        <span class="btn-label">Yeni Konuşma</span>
+      </button>
+
+      <!-- Conversation list (shown when expanded) -->
+      <div class="conv-section" id="convSection">
+        <div class="conv-section-title">Geçmiş</div>
+        <div class="conv-list" id="convList"></div>
+      </div>
+
+      <div class="sidebar-spacer"></div>
+
+      <!-- Settings -->
+      <button class="sidebar-btn" onclick="openSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="tip">Ayarlar</span>
+        <span class="btn-label">Ayarlar</span>
+      </button>
+    </div>
+
+    <!-- Main panel -->
+    <div class="main-panel">
+      <div class="topbar">
+        <div class="topbar-brand">
+          <div class="brand-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+          <span class="brand-name">AI CAD Studio</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <!-- Thinking Mode Toggle (topbar) -->
+          <button id="btnThinking" onclick="toggleThinking()" title="Derin Düşünce Modu (Claude/Gemini)" style="background:transparent;border:1px solid transparent;color:#888;cursor:pointer;padding:5px 10px;border-radius:8px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;transition:all .15s;font-family:var(--font);" onmouseover="this.style.color='#fff'" onmouseout="if(!thinkingMode)this.style.color='#888'">
+            <span style="font-size:14px;">🧠</span>
+            <span id="thinkingLabel">Düşünce</span>
+          </button>
+          <button id="btnConnectPill" class="btn-connect-pill disconnected" onclick="openConnectModal()" title="Fusion 360 Bağlantı Durumu">
+            <span class="status-dot"></span>
+            <span class="status-text" id="connectPillText">Fusion'a Bağlan</span>
+          </button>
+          <button onclick="startNewChat()" title="Yeni Sohbet Başlat" style="background:transparent;border:none;color:#888;cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button onclick="location.reload()" title="Arayüzü Yenile" style="background:transparent;border:none;color:#888;cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- External browser warning banner -->
+      <div id="fusionNoticeBanner" style="display:none;background:#241604;border-bottom:1px solid #d97706;padding:9px 16px;font-size:12px;color:#fcd34d;line-height:1.45;">
+        ⚠️ <b>Fusion 360 Bağlantısı:</b> Çizilen modellerin Fusion 360 ekranına gelmesi için Fusion'ı açıp eklentiyi çalıştırın. <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:6px;">Fusion'a Nasıl Bağlanılır? &rarr;</a>
+      </div>
+
+      <!-- View Mode Tabs -->
+      <div class="view-tabs">
+        <button class="view-tab active" id="tabChat" onclick="switchView('chat')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          AI Sohbet
+        </button>
+        <button class="view-tab" id="tabParam" onclick="switchView('param')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          Parametrik
+        </button>
+      </div>
+
+      <!-- Chat View -->
+      <div id="viewChat" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="chat-area" id="chatArea">
+          <div class="welcome" id="welcomeScreen">
+            <div class="welcome-greeting" id="greetingText">İyi günler, Yunus!</div>
+            <div class="welcome-sub">Fusion 360'ta serbestçe fikir danışabilir, referans görsel yükleyebilir veya doğrudan 3D model tasarlatabilirsin.</div>
+            <div class="quick-actions">
+              <div class="quick-chip" onclick="sendQuick('Uçak oluşturmak istiyorum bu uçağın tasarımını nasıl yapalım sence?')">✈️ Uçak Tasarımı Danış</div>
+              <div class="quick-chip" onclick="quickInspectDesign()">🔍 Mevcut Tasarımı İncele</div>
+              <div class="quick-chip" onclick="sendQuick('50mm x 30mm x 20mm boyutlarında katı bir kutu oluştur')">📦 50x30x20mm Kutu</div>
+              <div class="quick-chip" onclick="sendQuick('Çapı 40mm, yüksekliği 60mm olan ve merkezinde 15mm delik bulunan bir silindir oluştur')">⚙️ Delikli Silindir</div>
+            </div>
+          </div>
+          <div class="messages" id="messagesContainer"></div>
+        </div>
+
+        <div class="input-bar-wrapper">
+          <!-- Image preview tray -->
+          <div id="imagePreviewTray" class="image-preview-tray" style="display:none;">
+            <div class="image-preview-card">
+              <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Önizleme">
+              <div class="image-preview-info">
+                <span id="imagePreviewName" class="image-preview-name">referans.png</span>
+                <span class="image-preview-tag">Referans Görsel</span>
+              </div>
+              <button type="button" class="btn-remove-image" onclick="removeAttachedImage()" title="Görseli Kaldır">✕</button>
+            </div>
+          </div>
+
+          <div class="input-bar">
+            <button type="button" class="btn-attach" id="btnAttach" onclick="document.getElementById('imageFileInput').click()" title="Referans Görsel Ekle (veya Ctrl+V ile yapıştır)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </button>
+            <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+            <textarea id="promptInput" placeholder="Bir fikir sor, uçak/parça tarif et veya görsel yükle..." rows="1"
+                      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="btn-send" id="btnSend" onclick="generateCAD()" title="Gönder">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405z"/></svg>
+            </button>
+          </div>
+          <div class="bottom-row">
+            <button class="model-selector" onclick="openSettings()" id="modelSelectorBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span id="currentModelLabel">Ayarlardan model seçin</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="workspaceStatusBadge" style="margin-left:auto;display:none;align-items:center;gap:6px;font-size:11.5px;color:#888;cursor:pointer;padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);transition:all 0.2s;" onclick="quickInspectDesign()" title="Çalışma alanındaki mevcut gövdeleri ve ölçüleri incele">
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#00b8d4;"></span>
+              <span id="workspaceStatusText">Model: Taranıyor...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parametric View -->
+      <div id="viewParam" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div class="param-panel active" id="paramPanel">
+          <div class="param-header">
+            <h3>⚙️ Parametrik Modelleme</h3>
+            <p>Doğal dilde parça tanımla, AI parametreli Fusion 360 kodu üretsin — sliderlarla anlık kontrol et.</p>
+          </div>
+          <div class="param-content">
+            <div class="param-input-row">
+              <textarea id="paramPrompt" placeholder="Örn: Çapı 40mm, yüksekliği 60mm olan, merkezinde 15mm delik bulunan bir silindir oluştur" rows="3"></textarea>
+              <button class="btn-param-gen" id="btnParamGen" onclick="generateParametric()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Oluştur
+              </button>
+            </div>
+
+            <div id="paramSlidersContainer" class="param-sliders" style="display:none;"></div>
+
+            <div class="param-preview-area" id="paramPreview">
+              <div style="text-align:center;">
+                <div style="font-size:32px;margin-bottom:8px;">⚙️</div>
+                <div>Parametrik bir parça tanımla, AI sliderlar oluştursun ve Fusion 360'ta anlık uygulansın.</div>
+              </div>
+            </div>
+
+            <div id="paramStatus" class="param-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⚙️ AI Model Ayarları</span>
+        <button class="panel-close" onclick="closeSettings()">&times;</button>
+      </div>
+
+      <!-- Thinking Mode Toggle -->
+      <div class="thinking-toggle" id="thinkingTogglePanel" onclick="toggleThinking()">
+        <span class="thinking-icon">🧠</span>
+        <div class="thinking-label">
+          <div class="thinking-label-title">Derin Düşünce Modu</div>
+          <div class="thinking-label-sub">Claude / Gemini için genişletilmiş akıl yürütme</div>
+        </div>
+        <div class="toggle-switch"></div>
+      </div>
+
+      <!-- Source Mode Switch (Bulut vs Yerel Model) -->
+      <div class="source-mode-switch">
+        <button type="button" class="source-mode-btn active" id="btnModeCloud" onclick="setSourceMode('cloud')">
+          <span>☁️</span><span>Bulut API'leri</span>
+        </button>
+        <button type="button" class="source-mode-btn" id="btnModeLocal" onclick="setSourceMode('local')">
+          <span>🖥️</span><span>Yerel Model (Local)</span>
+        </button>
+      </div>
+
+      <!-- Cloud Settings Section -->
+      <div id="cloudSettingsSection">
+        <div class="s-label">Sağlayıcı</div>
+        <div class="provider-list" id="providerList"></div>
+
+        <!-- API Key (hidden for Ollama) -->
+        <div class="s-group" id="apiKeySection" style="display:none">
+          <div class="s-label">API Anahtarı</div>
+          <div class="s-row">
+            <input type="password" id="apiKey" class="s-control" placeholder="Anahtarınızı girin..." />
+            <button class="btn-connect" id="btnConnect" onclick="connectProvider()">Bağlan</button>
+          </div>
+          <div class="s-hint" id="apiHint"></div>
+        </div>
+
+        <!-- Model selector (shown after connection) -->
+        <div class="s-group" id="modelSection" style="display:none">
+          <div class="s-label">Model</div>
+          <select id="modelSelect" class="s-control"></select>
+        </div>
+
+        <!-- Placeholder when not connected -->
+        <div class="model-status" id="modelStatusMsg" style="display:none"></div>
+      </div>
+
+      <!-- Local Model Settings Section -->
+      <div id="localSettingsSection" style="display:none;">
+        <!-- Quick Preset Chips -->
+        <div class="s-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Hızlı Sunucu Şablonları</span>
+          <span style="font-size:10px;color:var(--text-3);text-transform:none;">Tek tıkla ayarla</span>
+        </div>
+        <div class="local-presets">
+          <button type="button" class="local-chip active" id="chipLmStudio" onclick="applyLocalPreset('lmstudio')">
+            ⚡ LM Studio (1234)
+          </button>
+          <button type="button" class="local-chip" id="chipOllama" onclick="applyLocalPreset('ollama')">
+            🦙 Ollama (11434)
+          </button>
+          <button type="button" class="local-chip" id="chipLlamaCpp" onclick="applyLocalPreset('llamacpp')">
+            ⚙️ llama.cpp / LocalAI (8080)
+          </button>
+        </div>
+
+        <!-- Base URL Input -->
+        <div class="s-group">
+          <div class="s-label">Base URL (OpenAI-uyumlu API Adresi)</div>
+          <input type="text" id="localBaseUrl" class="s-control" placeholder="http://localhost:1234/v1" value="http://localhost:1234/v1" />
+          <div class="s-hint" style="font-size:11px;color:#8c97ab;margin-top:3px;">
+            LM Studio varsayılanı: <code>http://localhost:1234/v1</code>
+          </div>
+        </div>
+
+        <!-- Model Name Input & Fetch Models Button -->
+        <div class="s-group">
+          <div class="s-label">Model Adı</div>
+          <div class="s-row">
+            <input type="text" id="localModelInput" class="s-control" placeholder="örn: qwen2.5-coder-7b veya deepseek-r1" />
+            <button type="button" class="btn-connect" id="btnFetchLocalModels" onclick="fetchLocalModelsUI()">Modelleri Listele</button>
+          </div>
+          <!-- Model dropdown if models are loaded -->
+          <select id="localModelSelect" class="s-control" style="display:none;margin-top:8px;" onchange="onLocalModelSelected(this.value)">
+            <option value="">-- Sunucudaki Modellerden Birini Seçin --</option>
+          </select>
+          <div class="s-hint" id="localModelHint" style="font-size:11px;color:#8c97ab;margin-top:3px;">
+            Model adını elle yazabilir veya "Modelleri Listele" ile sunucudan seçebilirsiniz.
+          </div>
+        </div>
+
+        <!-- Optional API Key -->
+        <div class="s-group">
+          <div class="s-label">API Anahtarı (Opsiyonel)</div>
+          <input type="password" id="localApiKey" class="s-control" placeholder="Gerekmiyorsa boş bırakın (örn: lm-studio)" />
+          <div class="s-hint" style="font-size:11px;color:#8c97ab;margin-top:3px;">
+            Çoğu yerel sunucu (LM Studio / Ollama) anahtar gerektirmez.
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button type="button" class="btn-test-local" id="btnTestLocal" onclick="testLocalConnectionUI()">
+            <span>🔌</span><span>Bağlantıyı Test Et</span>
+          </button>
+          <button type="button" class="btn-save-local" id="btnSaveLocal" onclick="saveAndApplyLocalSettings()">
+            <span>💾</span><span>Kaydet & Kullan</span>
+          </button>
+        </div>
+
+        <!-- Test Result Status Box -->
+        <div id="localStatusBox" class="local-status-box" style="display:none;"></div>
+
+        <!-- Help Card -->
+        <div class="local-help-card">
+          <div class="local-help-title">
+            <span>💡</span><span>Yerel LLM Nasıl Kullanılır?</span>
+          </div>
+          <div style="font-size:11.5px;color:#94a3b8;line-height:1.5;">
+            1. <b>LM Studio</b> veya <b>Ollama</b> uygulamasını açın.<br/>
+            2. Yerel sunucuyu (<b>Start Server</b>) başlatın.<br/>
+            3. "Bağlantıyı Test Et" butonuyla doğrulayıp "Kaydet & Kullan"a basın.
+            <div style="margin-top:7px;padding:6px 8px;background:rgba(56,189,248,0.08);border-left:2px solid #38bdf8;border-radius:4px;color:#e0f2fe;">
+              ⚠️ <b>LM Studio İpucu:</b> Developer/Server sekmesinde <b>Enable CORS</b> seçeneğini açık tutun.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connect Fusion Modal -->
+  <div class="connect-overlay" id="connectFusionModal" onclick="if(event.target===this)closeConnectModal()">
+    <div class="connect-modal">
+      <div class="connect-header">
+        <div>
+          <div class="connect-title">Connect Fusion</div>
+          <div class="connect-subtitle">Install the AI CAD Studio add-in to work beside your model in Fusion.</div>
+        </div>
+        <button class="connect-close-btn" onclick="closeConnectModal()" title="Kapat">&times;</button>
+      </div>
+
+      <div class="connect-steps">
+        <!-- Step 1: Download installer / Open folder -->
+        <div class="step-card">
+          <div class="step-badge">1</div>
+          <div class="step-content">
+            <div class="step-title">Download the installer / Eklentiyi Aç</div>
+            <div class="step-desc">Windows veya macOS üzerinde doğrudan çalıştırın. Eklenti dosyaları bilgisayarınızda hazır.</div>
+            <button class="btn-download-win" onclick="openAddInFolder()">
+              <svg viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.801"/></svg>
+              <span>Download for Windows / Eklenti Klasörünü Aç</span>
+            </button>
+            <div class="step-link">
+              On a Mac? <span onclick="alert('Mac için AICADBridge klasörünü ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/ dizinine kopyalayın.')">Download the macOS installer</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Install -->
+        <div class="step-card">
+          <div class="step-badge">2</div>
+          <div class="step-content">
+            <div class="step-title">Install</div>
+            <div class="step-desc">Run the installer, then restart Fusion. (Eklenti klasörünü AddIns dizinine yerleştirin veya doğrudan çalıştırın)</div>
+          </div>
+        </div>
+
+        <!-- Step 3: Open Fusion -->
+        <div class="step-card">
+          <div class="step-badge">3</div>
+          <div class="step-content">
+            <div class="step-title">Open Fusion</div>
+            <div class="step-desc">Open AI CAD from the toolbar at the top. (SOLID sekmesinde SELECT yanında yer alır)</div>
+            <div class="ribbon-mockup-wrapper">
+              <div class="ribbon-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2"><path d="M2 12h20M6 12v-4M10 12v-2M14 12v-4M18 12v-2"/></svg>
+                <span>INSPECT ▾</span>
+              </div>
+              <div class="ribbon-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#2980b9" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>INSERT ▾</span>
+              </div>
+              <div class="ribbon-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#27ae60" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 3"/><path d="M12 12l5 5"/></svg>
+                <span>SELECT ▾</span>
+              </div>
+              <div class="ribbon-item promoted">
+                <div class="cad-icon-gem">AI</div>
+                <span>AI CAD ▾</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Use on web or in Fusion -->
+        <div class="step-card">
+          <div class="step-badge">4</div>
+          <div class="step-content">
+            <div class="step-title">Use AI CAD on the web or in Fusion</div>
+            <div class="dual-preview-grid">
+              <!-- Inside Fusion card -->
+              <div class="dual-card">
+                <div class="dual-card-graphic">
+                  <svg width="100%" height="80" viewBox="0 0 160 80" fill="none">
+                    <path d="M20 50 L80 20 L140 50 L80 75 Z" fill="#0d131f" stroke="#1f2c42" stroke-width="1"/>
+                    <path d="M50 35 L110 65" stroke="#172233" stroke-width="1"/>
+                    <path d="M110 35 L50 65" stroke="#172233" stroke-width="1"/>
+                    <polygon points="65,30 95,18 95,35 65,47" fill="#00b8d4" opacity="0.85"/>
+                    <polygon points="65,47 95,35 95,52 65,64" fill="#00838f" opacity="0.95"/>
+                    <polygon points="40,38 65,30 65,47 40,55" fill="#4dd0e1" opacity="0.95"/>
+                    <rect x="105" y="10" width="48" height="60" rx="4" fill="#181e2b" stroke="#00b8d4" stroke-width="1.2"/>
+                    <rect x="110" y="16" width="38" height="4" rx="2" fill="#00b8d4"/>
+                    <rect x="110" y="24" width="28" height="3" rx="1.5" fill="#4b5568"/>
+                    <rect x="110" y="31" width="34" height="3" rx="1.5" fill="#4b5568"/>
+                    <rect x="110" y="52" width="38" height="12" rx="3" fill="#00b8d4" opacity="0.4"/>
+                  </svg>
+                </div>
+                <div class="dual-card-label">Inside Fusion</div>
+              </div>
+
+              <!-- Here on the web card -->
+              <div class="dual-card">
+                <div class="dual-card-graphic">
+                  <svg width="100%" height="80" viewBox="0 0 160 80" fill="none">
+                    <rect x="12" y="8" width="136" height="64" rx="5" fill="#161b26" stroke="#2d3748" stroke-width="1"/>
+                    <rect x="12" y="8" width="136" height="12" rx="5" fill="#0f131a"/>
+                    <circle cx="20" cy="14" r="2" fill="#e53e3e"/>
+                    <circle cx="26" cy="14" r="2" fill="#ecc94b"/>
+                    <circle cx="32" cy="14" r="2" fill="#38a169"/>
+                    <rect x="42" y="11" width="76" height="6" rx="3" fill="#1e2638"/>
+                    <rect x="20" y="26" width="70" height="12" rx="4" fill="#1f293d"/>
+                    <rect x="60" y="42" width="78" height="16" rx="4" fill="#00b8d4" opacity="0.3"/>
+                    <rect x="20" y="62" width="120" height="6" rx="3" fill="#1a2233"/>
+                  </svg>
+                </div>
+                <div class="dual-card-label">Here, on the web</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Connection Status Box -->
+      <div id="modalLiveBridgeStatus" class="modal-status-box disconnected">
+        <span id="modalLiveBridgeText">🔴 <b>Fusion 360 Bekleniyor...</b> Fusion 360 açıldığında otomatik bağlanır.</span>
+        <button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Kontrol Et</button>
+      </div>
+
+      <div class="connect-footer">
+        Still don't see AI CAD? In Fusion, press <kbd>Shift+S</kbd>, select <b>AICADBridge</b> under Add-Ins, and click <b>Run</b>.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Provider registry with CADAM-style categorization ──
+    const PROVIDERS = [
+      // Güçlü Akıl Yürütme Modelleri
+      { id:'anthropic',  name:'Anthropic (Claude)', icon:'A\\', iconBg:'#2a1e1e', category:'powerful', badgeClass:'powerful', tag:'Thinking', needsKey:true },
+      { id:'openai',     name:'OpenAI (GPT-4o)',    icon:'◎',  iconBg:'#1a3a2a', category:'powerful', badgeClass:'powerful', tag:'Flagship', needsKey:true },
+      { id:'google',     name:'Google (Gemini)',    icon:'✦',  iconBg:'#1e2a3a', category:'powerful', badgeClass:'powerful', tag:'Thinking', needsKey:true },
+      { id:'deepseek',   name:'DeepSeek (R1/V3)',   icon:'🔍', iconBg:'#1e2a2a', category:'powerful', badgeClass:'powerful', tag:'Reasoning', needsKey:true },
+      // Ultra Hızlı & API Sağlayıcıları
+      { id:'groq',       name:'Groq (Llama 3)',     icon:'⚡', iconBg:'#2a2a1e', category:'fast',     badgeClass:'fast',     tag:'Ultra Hızlı', needsKey:true },
+      { id:'openrouter', name:'OpenRouter',          icon:'⇆',  iconBg:'#1e1e2a', category:'fast',     badgeClass:'fast',     tag:'Multi-Hub', needsKey:true },
+      // Yerel & Gizlilik Odaklı Modeller
+      { id:'ollama',     name:'Ollama',             icon:'🖥️', iconBg:'#2d2d2d', category:'local',    badgeClass:'local',    tag:'Yerel',     needsKey:false },
+      { id:'local',      name:'Yerel Model (Local)', icon:'🖥️', iconBg:'#152936', category:'local',    badgeClass:'local',    tag:'Offline',   needsKey:false },
+    ];
+
+    let state = {
+      sourceMode: localStorage.getItem('aicad_source_mode') || 'cloud',
+      provider: localStorage.getItem('aicad_provider') || 'ollama',
+      model: localStorage.getItem('aicad_model') || '',
+      modelName: localStorage.getItem('aicad_modelName') || '',
+      localBaseUrl: localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1',
+      localModel: localStorage.getItem('aicad_local_model') || '',
+      localApiKey: localStorage.getItem('aicad_local_api_key') || '',
+      localConnected: false,
+      ollamaModels: [],
+      fetchedModels: {},  // provider -> [{id, name}]
+      isGenerating: false,
+      connected: {},      // provider -> bool
+    };
+
+    // ── Fusion Bridge & Web Bridge State ──
+    let bridgeState = {
+      isInsideFusion: false,
+      isWebConnected: false,
+      pollingTimer: null
+    };
+
+    function openConnectModal() {
+      checkBridgeStatus();
+      document.getElementById('connectFusionModal').classList.add('visible');
+    }
+
+    function closeConnectModal() {
+      document.getElementById('connectFusionModal').classList.remove('visible');
+    }
+
+    async function openAddInFolder() {
+      try {
+        const res = await fetch('http://127.0.0.1:49876/open_folder', { method: 'POST' });
+        if (res.ok) return;
+      } catch(e) {}
+      const p = "C:\\Users\\Yunus\\AppData\\Roaming\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\AICADBridge";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(p).then(() => {
+          alert("Eklenti klasör yolu panoya kopyalandı:\n" + p + "\n\nDosya Gezgini'ne yapıştırıp klasöre erişebilirsiniz.");
+        }).catch(() => {
+          prompt("Eklenti klasör yolu:", p);
+        });
+      } else {
+        prompt("Eklenti klasör yolu:", p);
+      }
+    }
+
+    function sendToFusion(action, data) {
+      const p = typeof data === 'string' ? data : JSON.stringify(data || {});
+      if (typeof adsk !== 'undefined' && adsk.fusionSendData) {
+        adsk.fusionSendData(action, p).catch(e => console.error('[Fusion Send error]', e));
+      } else {
+        console.log('[Dev/Web] →', action, p);
+      }
+    }
+
+    async function sendToFusionAsync(action, data) {
+      const p = typeof data === 'string' ? data : JSON.stringify(data || {});
+
+      // 1. Durum: Fusion 360 İç Paletinde Çalışıyor
+      if (typeof adsk !== 'undefined' && adsk.fusionSendData) {
+        return new Promise((resolve, reject) => {
+          adsk.fusionSendData(action, p).then(result => {
+            try {
+              const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+              resolve(parsed);
+            } catch(e) {
+              resolve(result);
+            }
+          }).catch(err => {
+            console.error('[Fusion Async Error]', err);
+            reject(err);
+          });
+        });
+      }
+
+      // 2. Durum: Harici Tarayıcı (Chrome / Edge) -> 127.0.0.1:49876 Yerel Web Köprüsü
+      if (action === 'executeCADCode') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: data.code })
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const jsonRes = await res.json();
+          return jsonRes;
+        } catch(err) {
+          console.warn('[Web Köprüsü] İstek başarısız:', err);
+          return {
+            success: false,
+            error: 'Fusion 360 Yerel Web Köprüsüne bağlanılamadı (127.0.0.1:49876). Lütfen Fusion 360\'ı açıp eklentiyi çalıştırın.',
+            devMode: true
+          };
+        }
+      }
+
+      if (action === 'getDesignState' || action === 'inspectDesign') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/design_state', { signal: AbortSignal.timeout(2500) });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.json();
+        } catch(err) {
+          console.warn('[Web Köprüsü] Tasarım durumu alınamadı:', err);
+          return { success: false, error: 'Tasarım durumu okunamadı', design: null };
+        }
+      }
+
+      if (action === 'fetchModels') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/fetch_models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data || {}),
+            signal: AbortSignal.timeout(6000)
+          });
+          if (res.ok) return await res.json();
+        } catch(err) {
+          console.warn('[Web Köprüsü] fetchModels başarısız:', err);
+        }
+      }
+
+      if (action === 'callLLM') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/call_llm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data || {}),
+            signal: AbortSignal.timeout(160000)
+          });
+          if (res.ok) return await res.json();
+        } catch(err) {
+          console.warn('[Web Köprüsü] callLLM başarısız:', err);
+        }
+      }
+
+      return {
+        success: false,
+        error: 'Bu işlem için aktif Fusion 360 oturumu gereklidir.',
+        devMode: true
+      };
+    }
+
+    async function checkBridgeStatus() {
+      const isInside = typeof adsk !== 'undefined' && Boolean(adsk.fusionSendData);
+      const pill = document.getElementById('btnConnectPill');
+      const pillText = document.getElementById('connectPillText');
+      const banner = document.getElementById('fusionNoticeBanner');
+      const modalStatus = document.getElementById('modalLiveBridgeStatus');
+
+      if (isInside) {
+        bridgeState.isInsideFusion = true;
+        bridgeState.isWebConnected = true;
+        if (pill) {
+          pill.className = 'btn-connect-pill connected';
+          if (pillText) pillText.textContent = 'Fusion 360';
+        }
+        if (banner) banner.style.display = 'none';
+        if (modalStatus) {
+          modalStatus.className = 'modal-status-box connected';
+          modalStatus.innerHTML = '<span>🟢 <b>Fusion 360 Açık ve Bağlı</b> (İç Panel Modu)</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">✓ Aktif</button>';
+        }
+        getCurrentDesignState().then(d => { if (d) updateWorkspaceStatusBadge(d); });
+        return;
+      }
+
+      bridgeState.isInsideFusion = false;
+      // Harici web tarayıcısı: http://127.0.0.1:49876/health kontrolü
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 1500);
+        const res = await fetch('http://127.0.0.1:49876/health', { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (res.ok) {
+          bridgeState.isWebConnected = true;
+          if (pill) {
+            pill.className = 'btn-connect-pill connected';
+            if (pillText) pillText.textContent = 'Fusion 360 Bağlı';
+          }
+          if (banner) banner.style.display = 'none';
+          if (modalStatus) {
+            modalStatus.className = 'modal-status-box connected';
+            modalStatus.innerHTML = '<span>🟢 <b>Fusion 360 Web Köprüsü Bağlı!</b> (127.0.0.1:49876) Tasarımlar Fusion ekranına anında çizilir.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Yenile</button>';
+          }
+          getCurrentDesignState().then(d => { if (d) updateWorkspaceStatusBadge(d); });
+          return;
+        }
+      } catch(e) {
+        // unreachable
+      }
+
+      // Bağlantı yok
+      bridgeState.isWebConnected = false;
+      const wsBadge = document.getElementById('workspaceStatusBadge');
+      if (wsBadge) wsBadge.style.display = 'none';
+      if (pill) {
+        pill.className = 'btn-connect-pill disconnected';
+        if (pillText) pillText.textContent = "Fusion'a Bağlan";
+      }
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = `⚠️ <b>Fusion 360 Bağlantısı Aranıyor:</b> Web üzerinden çizilen modellerin Fusion 360 ekranına yansıması için <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:4px;">Fusion'a Bağlan &rarr;</a>`;
+      }
+      if (modalStatus) {
+        modalStatus.className = 'modal-status-box disconnected';
+        modalStatus.innerHTML = '<span>🔴 <b>Fusion 360 Bekleniyor...</b> Fusion 360 ve AICADBridge açıldığında otomatik bağlanır.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Kontrol Et</button>';
+      }
+    }
+
+    window.fusionJavaScriptHandler = {
+      handle(action, data) {
+        try {
+          const d = typeof data === 'string' ? JSON.parse(data) : data;
+          if (action === 'setOllamaModels') onOllamaModels(d);
+          else if (action === 'modelsResult') onModelsResult(d);
+          else if (action === 'statusUpdate') onStatusUpdate(d);
+          else if (action === 'taskResult') onTaskResult(d);
+        } catch(e) { console.error(e); }
+        return "OK";
+      }
+    };
+
+    // ── Workspace Geometry Inspector ──
+    async function getCurrentDesignState() {
+      try {
+        const res = await sendToFusionAsync('getDesignState', {});
+        if (res && res.design) return res.design;
+      } catch(e) {
+        console.warn('getCurrentDesignState hatası:', e);
+      }
+      return null;
+    }
+
+    function updateWorkspaceStatusBadge(design) {
+      const badge = document.getElementById('workspaceStatusBadge');
+      const text = document.getElementById('workspaceStatusText');
+      if (!badge || !text) return;
+      if (!design || !design.has_design) {
+        badge.style.display = 'none';
+        return;
+      }
+      badge.style.display = 'inline-flex';
+      if (design.bodies_count > 0) {
+        const firstBody = design.bodies[0];
+        const dims = firstBody?.dimensions_mm;
+        const dimStr = dims ? `(${dims.width_x}x${dims.length_y}x${dims.height_z}mm)` : '';
+        text.innerHTML = `Model: <b>${design.bodies_count} Gövde</b> ${dimStr}`;
+        badge.style.color = '#38bdf8';
+        badge.style.borderColor = 'rgba(56,189,248,0.35)';
+        badge.style.background = 'rgba(56,189,248,0.1)';
+      } else {
+        text.textContent = 'Model: Çalışma Alanı Boş';
+        badge.style.color = '#888';
+        badge.style.borderColor = 'rgba(255,255,255,0.1)';
+        badge.style.background = 'rgba(255,255,255,0.03)';
+      }
+    }
+
+    async function quickInspectDesign() {
+      const text = document.getElementById('workspaceStatusText');
+      if (text) text.textContent = 'Model taranıyor...';
+      const design = await getCurrentDesignState();
+      updateWorkspaceStatusBadge(design);
+
+      if (!design || !design.has_design) {
+        addMsg('ai', '<div class="status-badge error">❌ Fusion 360 aktif tasarımı okunamadı. Lütfen Fusion 360\'ta açık bir tasarım dokümanı olduğundan ve AICADBridge eklentisinin çalıştığından emin olun.</div>');
+        return;
+      }
+
+      let inspectHtml = '';
+      if (design.bodies_count > 0) {
+        inspectHtml = `
+          <div class="status-badge success" style="margin-bottom:8px;">📐 Fusion 360 Çalışma Alanı İncelendi</div>
+          <div style="font-size:13px;color:#e2e8f0;line-height:1.55;">
+            <b>Aktif Doküman:</b> ${esc(design.doc_name)}<br/>
+            <b>Tespit Edilen Katı Gövde:</b> ${design.bodies_count} adet<br/>
+            <ul style="margin:8px 0 8px 18px;color:#94a3b8;font-size:12.5px;">
+              ${design.bodies.map(b => `
+                <li><b>${esc(b.name)}:</b> Genişlik X=${b.dimensions_mm.width_x}mm, Uzunluk Y=${b.dimensions_mm.length_y}mm, Yükseklik Z=${b.dimensions_mm.height_z}mm | Sınırlar: X[${b.bounds_mm.min[0]}..${b.bounds_mm.max[0]}], Y[${b.bounds_mm.min[1]}..${b.bounds_mm.max[1]}], Z[${b.bounds_mm.min[2]}..${b.bounds_mm.max[2]}] mm</li>
+              `).join('')}
+            </ul>
+            ${design.sketches_count > 0 ? `<div style="font-size:12px;color:#64748b;margin-bottom:6px;">Mevcut Eskizler: ${design.sketches.map(s => esc(s.name)).join(', ')}</div>` : ''}
+            <div style="margin-top:10px;padding:9px 12px;background:rgba(0,184,212,0.1);border-left:3px solid #00e5ff;border-radius:4px;font-size:12.5px;color:#e0f2fe;">
+              💡 <i>Yapay zeka bu gövdeleri ve sınır ölçülerini hafızasına aldı. Şimdi bu modelin üzerine bir parça eklemek (örn. kanat, kapak, delik vb.) için doğrudan talimat verebilirsin!</i>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="quick-chip" style="background:rgba(0,184,212,0.12);border-color:rgba(0,184,212,0.4);color:#00e5ff;font-weight:600;" onclick="sendQuick('Mevcut gövde üzerine sonraki adımı ekle')">
+                ➡️ Sonraki Adımı Ekle
+              </button>
+              <button class="quick-chip" onclick="sendQuick('Mevcut modele uygun kanatları ekle')">
+                ✈️ Kanatları Ekle
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        inspectHtml = `
+          <div class="status-badge" style="margin-bottom:8px;">📐 Fusion 360 Çalışma Alanı İncelendi</div>
+          <div style="font-size:13px;color:#e2e8f0;line-height:1.5;">
+            <b>Aktif Doküman:</b> ${esc(design.doc_name)}<br/>
+            Şu anda çalışma alanında katı bir gövde bulunmuyor (boş model).<br/>
+            Sıfırdan tasarıma başlamak için bir fikir danışabilir veya parça tarif edebilirsin!
+          </div>
+        `;
+      }
+      addMsg('ai', inspectHtml);
+    }
+
+    // ── Init ──
+    document.addEventListener('DOMContentLoaded', () => {
+      checkBridgeStatus();
+      setInterval(checkBridgeStatus, 3500);
+      setGreeting();
+      renderProviderList();
+      updateModelLabel();
+      scanOllama();
+
+      // ── Yeni Özellik Başlatmaları ──
+      loadConversations();           // Konuşma geçmişini yükle
+      currentConvId = generateConvId(); // İlk oturum ID'si
+      applyThinkingUI();             // Thinking mode durumunu uygula
+
+      // Auto-restore saved connections: re-fetch models for providers with saved keys
+      PROVIDERS.forEach(p => {
+        if (!p.needsKey) return;
+        const k = localStorage.getItem('aicad_key_' + p.id);
+        if (k) {
+          fetchModelsJS(p.id, k).then(res => {
+            if (res.success && res.models.length > 0) {
+              state.fetchedModels[p.id] = res.models;
+              state.connected[p.id] = true;
+              updateModelLabel();
+            }
+          });
+        }
+      });
+    });
+
+
+    function setGreeting() {
+      const h = new Date().getHours();
+      let g = 'İyi günler';
+      if (h < 6) g = 'İyi geceler';
+      else if (h < 12) g = 'Günaydın';
+      else if (h >= 18) g = 'İyi akşamlar';
+      document.getElementById('greetingText').textContent = g + ', Yunus!';
+    }
+
+    // ── Provider list rendering with categories ──
+    function renderProviderList() {
+      const list = document.getElementById('providerList');
+      list.innerHTML = '';
+
+      const categories = [
+        { key: 'powerful', label: '🧠 Güçlü Akıl Yürütme Modelleri' },
+        { key: 'fast',     label: '⚡ Ultra Hızlı & API Sağlayıcıları' },
+        { key: 'local',    label: '🖥️ Yerel & Ücretsiz (Gizlilik Odaklı)' }
+      ];
+
+      categories.forEach(cat => {
+        const catProviders = PROVIDERS.filter(p => p.category === cat.key);
+        if (!catProviders.length) return;
+
+        const header = document.createElement('div');
+        header.className = 'model-cat-group-header';
+        header.textContent = cat.label;
+        list.appendChild(header);
+
+        catProviders.forEach(p => {
+          const item = document.createElement('div');
+          item.className = 'provider-item' + (p.id === state.provider ? ' selected' : '');
+          item.onclick = () => selectProvider(p.id);
+          item.innerHTML = `
+            <div class="provider-icon" style="background:${p.iconBg};color:${p.id===state.provider?'#00b8d4':'#ccc'}">${p.icon}</div>
+            <span class="provider-name">${p.name}</span>
+            <span class="model-cat-badge ${p.badgeClass}">${p.tag}</span>
+          `;
+          list.appendChild(item);
+        });
+      });
+    }
+
+    function selectProvider(id) {
+      state.provider = id;
+      localStorage.setItem('aicad_provider', id);
+      renderProviderList();
+      showProviderSettings(id);
+    }
+
+    function showProviderSettings(id) {
+      const prov = PROVIDERS.find(p => p.id === id);
+      const apiSec = document.getElementById('apiKeySection');
+      const modelSec = document.getElementById('modelSection');
+      const statusMsg = document.getElementById('modelStatusMsg');
+      const hint = document.getElementById('apiHint');
+
+      if (!prov.needsKey) {
+        apiSec.style.display = 'none';
+        hint.textContent = '';
+        if (state.ollamaModels.length > 0) {
+          populateModelSelect(state.ollamaModels);
+          modelSec.style.display = 'block';
+          statusMsg.style.display = 'none';
+        } else {
+          modelSec.style.display = 'none';
+          statusMsg.style.display = 'block';
+          statusMsg.innerHTML = 'Ollama çalışmıyor veya yüklü model yok.<br><span style="color:var(--accent);cursor:pointer" onclick="scanOllama()">↻ Yeniden tara</span>';
+        }
+      } else {
+        apiSec.style.display = 'block';
+        const savedKey = localStorage.getItem('aicad_key_' + id) || '';
+        document.getElementById('apiKey').value = savedKey;
+
+        if (savedKey && state.fetchedModels[id]?.length > 0) {
+          hint.textContent = '✓ Bağlı';
+          hint.className = 's-hint ok';
+          populateModelSelect(state.fetchedModels[id]);
+          modelSec.style.display = 'block';
+          statusMsg.style.display = 'none';
+        } else if (savedKey) {
+          hint.textContent = 'Anahtar kayıtlı — Bağlan\'a tıklayın.';
+          hint.className = 's-hint';
+          modelSec.style.display = 'none';
+          statusMsg.style.display = 'none';
+        } else {
+          hint.textContent = '';
+          hint.className = 's-hint';
+          modelSec.style.display = 'none';
+          statusMsg.style.display = 'block';
+          statusMsg.textContent = 'Modelleri görmek için API anahtarını girin ve Bağlan\'a tıklayın.';
+        }
+      }
+    }
+
+    // ── Ollama scanning (direct JS fetch) ──
+    async function scanOllama() {
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 2000);
+        const r = await fetch('http://localhost:11434/api/tags', { signal: ctrl.signal });
+        clearTimeout(tid);
+        const d = await r.json();
+        const models = (d.models || []).filter(m => m.name).map(m => {
+          const gb = (m.size || 0) / (1024**3);
+          return { id: m.name, name: gb > 0.1 ? `${m.name} (${gb.toFixed(1)}GB)` : m.name };
+        });
+        state.ollamaModels = models;
+        state.connected['ollama'] = models.length > 0;
+      } catch(e) {
+        state.ollamaModels = [];
+        state.connected['ollama'] = false;
+      }
+      if (state.provider === 'ollama' && document.getElementById('settingsOverlay').classList.contains('visible')) {
+        showProviderSettings('ollama');
+      }
+      updateModelLabel();
+      // Also tell Python (for Fusion internal use)
+      sendToFusion('initUI', {});
+    }
+
+    // ── Direct JS model fetching from provider APIs ──
+    async function fetchModelsJS(provider, apiKey) {
+      const timeout = 15000;
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeout);
+
+      try {
+        let models = [];
+
+        if (provider === 'ollama') {
+          const r = await fetch('http://localhost:11434/api/tags', { signal: ctrl.signal });
+          const d = await r.json();
+          models = (d.models || []).filter(m => m.name).map(m => ({ id: m.name, name: m.name }));
+
+        } else if (provider === 'openai') {
+          const r = await fetch('https://api.openai.com/v1/models', {
+            headers: { 'Authorization': `Bearer ${apiKey}` }, signal: ctrl.signal
+          });
+          if (!r.ok) throw new Error(await getApiError(r));
+          const d = await r.json();
+          models = (d.data || [])
+            .filter(m => m.id && /^(gpt-|o1-|o3-|o4-|chatgpt-)/.test(m.id))
+            .filter(m => !/instruct|realtime|audio|search|tts|whisper|dall-e|embed/.test(m.id))
+            .map(m => ({ id: m.id, name: m.id }))
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+        } else if (provider === 'anthropic') {
+          // Anthropic doesn't support browser CORS — use known models
+          models = [
+            { id:'claude-sonnet-4-20250514',    name:'Claude Sonnet 4' },
+            { id:'claude-opus-4-20250514',      name:'Claude Opus 4' },
+            { id:'claude-3-7-sonnet-20250219',  name:'Claude 3.7 Sonnet' },
+            { id:'claude-3-5-sonnet-20241022',  name:'Claude 3.5 Sonnet' },
+            { id:'claude-3-5-haiku-20241022',   name:'Claude 3.5 Haiku' },
+          ];
+          // Validate key with a lightweight request (may fail due to CORS, that's OK)
+          try {
+            const r = await fetch('https://api.anthropic.com/v1/models', {
+              headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+              signal: ctrl.signal
+            });
+            if (r.ok) {
+              const d = await r.json();
+              if (d.data?.length > 0) {
+                models = d.data.map(m => ({ id: m.id, name: m.display_name || m.id }))
+                  .sort((a,b) => a.name.localeCompare(b.name));
+              }
+            }
+          } catch(e) { /* CORS block expected, use fallback list */ }
+
+        } else if (provider === 'google') {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+            signal: ctrl.signal
+          });
+          if (!r.ok) throw new Error(await getApiError(r));
+          const d = await r.json();
+          models = (d.models || [])
+            .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+            .map(m => ({ id: m.name.replace('models/',''), name: m.displayName || m.name }))
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+        } else if (provider === 'groq') {
+          const r = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { 'Authorization': `Bearer ${apiKey}` }, signal: ctrl.signal
+          });
+          if (!r.ok) throw new Error(await getApiError(r));
+          const d = await r.json();
+          models = (d.data || [])
+            .filter(m => m.id && m.active !== false)
+            .map(m => ({ id: m.id, name: m.id }))
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+        } else if (provider === 'openrouter') {
+          const r = await fetch('https://openrouter.ai/api/v1/models', {
+            headers: { 'Authorization': `Bearer ${apiKey}` }, signal: ctrl.signal
+          });
+          if (!r.ok) throw new Error(await getApiError(r));
+          const d = await r.json();
+          models = (d.data || [])
+            .map(m => ({ id: m.id, name: m.name || m.id }))
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+        } else if (provider === 'deepseek') {
+          const r = await fetch('https://api.deepseek.com/models', {
+            headers: { 'Authorization': `Bearer ${apiKey}` }, signal: ctrl.signal
+          });
+          if (!r.ok) throw new Error(await getApiError(r));
+          const d = await r.json();
+          models = (d.data || [])
+            .map(m => ({ id: m.id, name: m.id }))
+            .sort((a,b) => a.name.localeCompare(b.name));
+        }
+
+        clearTimeout(tid);
+        return { success: models.length > 0, models, error: models.length === 0 ? 'Model bulunamadı.' : null };
+
+      } catch(e) {
+        clearTimeout(tid);
+        let msg = e.name === 'AbortError' ? 'Bağlantı zaman aşımına uğradı.' : (e.message || 'Bağlantı hatası.');
+        return { success: false, models: [], error: msg };
+      }
+    }
+
+    // ── Türkçe Hata Tercüme ve Formatlama Motoru ──
+    function cleanErrorString(str) {
+      if (!str) return 'Bilinmeyen bir hata oluştu.';
+      let s = String(str).replace(/^(Error:\s*|Exception:\s*)/i, '').trim();
+      return s;
+    }
+
+    function formatErrorInTurkish(rawMsg, provider = '') {
+      if (!rawMsg) {
+        return {
+          title: 'Beklenmeyen Hata',
+          description: 'İşlem sırasında beklenmeyen bir hata oluştu.',
+          tip: 'Lütfen birkaç saniye sonra tekrar deneyin.',
+          raw: ''
+        };
+      }
+
+      const msg = String(rawMsg);
+      const provName = provider ? provider : 'API';
+
+      // 1. Google Gemini: Aşırı Yoğunluk (High Demand)
+      if (/currently experiencing high demand|spikes in demand|high demand/i.test(msg)) {
+        return {
+          title: `${provName} Servisi Aşırı Yoğun`,
+          description: 'Seçili yapay zeka modeli şu anda sunucu tarafında aşırı yoğunluk yaşıyor. Bu durum geçicidir.',
+          tip: 'Birkaç saniye bekleyip tekrar deneyebilir veya Ayarlar (⚙️) menüsünden alternatif bir modele (örn. Gemini Flash/Pro veya OpenRouter) geçebilirsiniz.',
+          raw: msg
+        };
+      }
+
+      // 2. OpenRouter: Provider returned error
+      if (/provider returned error/i.test(msg)) {
+        return {
+          title: `${provName} Sunucu Yanıtı Hatası`,
+          description: 'Yapay zeka sağlayıcısının sunucusu şu an bu modele yanıt veremedi veya model geçici olarak çevrimdışı.',
+          tip: 'Ayarlar (⚙️) menüsünden farklı bir model seçebilir veya birkaç saniye sonra "kaldığın yerden devam et" yazarak tekrar deneyebilirsiniz.',
+          raw: msg
+        };
+      }
+
+      // 3. Kullanım Kotası / Bakiye Tükendi
+      if (/resource has been exhausted|quota|insufficient_quota|exceeded your current quota|credits exhausted|insufficient credits|balance/i.test(msg)) {
+        return {
+          title: 'Kullanım Kotası veya Bakiye Yetersiz',
+          description: 'API sağlayıcınızdaki kullanım limitiniz (kota) dolmuş ya da hesap bakiyeniz tükenmiş.',
+          tip: 'Sağlayıcı hesabınızı kontrol edin, bakiye ekleyin veya yerel ve ücretsiz olan Ollama sağlayıcısına geçin.',
+          raw: msg
+        };
+      }
+
+      // 4. Geçersiz API Anahtarı / Yetkilendirme (401)
+      if (/api_key_invalid|invalid_api_key|incorrect api key|invalid x-api-key|invalid api key|unauthorized|401/i.test(msg)) {
+        return {
+          title: 'Geçersiz API Anahtarı',
+          description: 'Girdiğiniz API anahtarı servis tarafından doğrulanamadı veya süresi dolmuş.',
+          tip: 'Ayarlar (⚙️) menüsünden API anahtarınızı kontrol edip güncelleyin ve "Bağlan" butonuna tıklayın.',
+          raw: msg
+        };
+      }
+
+      // 5. İstek Sınırı / Rate Limit (429)
+      if (/rate limit|rate_limit_exceeded|too many requests|429/i.test(msg)) {
+        return {
+          title: 'İstek Sınırı Aşıldı (Rate Limit)',
+          description: 'Çok kısa sürede çok fazla istek gönderildi. Sağlayıcı dakikalık hız sınırına ulaştı.',
+          tip: 'Lütfen 10-15 saniye bekleyip isteğinizi tekrar gönderin.',
+          raw: msg
+        };
+      }
+
+      // 6. Bölge / Ülke Desteği Yok
+      if (/location is not supported|user location|country not supported/i.test(msg)) {
+        return {
+          title: 'Bölge / Coğrafi Kısıtlama',
+          description: 'Bulunduğunuz ülke veya IP adresi bu model sağlayıcısı tarafından doğrudan desteklenmiyor.',
+          tip: 'OpenRouter sağlayıcısını seçerek aynı modele bölgesel kısıtlama olmaksızın erişebilirsiniz.',
+          raw: msg
+        };
+      }
+
+      // 7. Model Bulunamadı / Erişim Yetkisi Yok (404)
+      if (/model not found|does not exist|model_not_found|404/i.test(msg)) {
+        return {
+          title: 'Model Bulunamadı',
+          description: 'Seçili yapay zeka modeli sağlayıcı listesinde bulunamadı veya hesabınızın bu modele erişimi yok.',
+          tip: 'Ayarlar (⚙️) menüsünden güncel ve aktif bir model seçin.',
+          raw: msg
+        };
+      }
+
+      // 8. Sunucu Aşırı Yüklü / Hizmet Dışı (503 / 502 / Overloaded)
+      if (/overloaded|capacity|service unavailable|503|502|bad gateway/i.test(msg)) {
+        return {
+          title: 'Sunucular Geçici Olarak Hizmet Dışı (HTTP 503)',
+          description: 'Yapay zeka sağlayıcısının sunucuları bakımda veya aşırı yük altında.',
+          tip: 'Lütfen 1-2 dakika sonra tekrar deneyin veya alternatif bir sağlayıcıya geçin.',
+          raw: msg
+        };
+      }
+
+      // 9. Dahili Sunucu Hatası (HTTP 500)
+      if (/internal server error|500/i.test(msg)) {
+        return {
+          title: 'Sağlayıcı Dahili Hatası (HTTP 500)',
+          description: 'Model sağlayıcısının kendi sunucularında dahili bir teknik arıza meydana geldi.',
+          tip: 'Genellikle kısa sürelidir, lütfen birkaç saniye sonra tekrar deneyin.',
+          raw: msg
+        };
+      }
+
+      // 10. Ağ Bağlantısı / Sunucuya Erişilemiyor
+      if (/failed to fetch|networkerror|econnrefused|ağ hatası|bağlantı kurulamadı|ulaşılamıyor/i.test(msg)) {
+        if (/local|lm studio|1234|8080|yerel/i.test(provName) || /1234|8080|localhost/.test(msg)) {
+          return {
+            title: 'Yerel Model Sunucusuna Ulaşılamıyor',
+            description: 'LM Studio veya yerel LLM sunucunuza erişilemedi. Sunucu henüz başlatılmamış veya adres/port yanlış olabilir.',
+            tip: 'LM Studio uygulamasını açın, "Start Server" butonuna basın ve Developer/Server sekmesinde "Enable CORS" seçeneğini işaretleyin.',
+            raw: msg
+          };
+        }
+        if (/ollama/i.test(provName) || /11434/.test(msg)) {
+          return {
+            title: 'Ollama Sunucusuna Bağlanılamadı',
+            description: 'Bilgisayarınızda çalışan yerel Ollama servisine erişilemiyor.',
+            tip: 'Ollama uygulamasını başlatın veya terminalde "ollama serve" komutunun çalıştığından emin olun.',
+            raw: msg
+          };
+        }
+        return {
+          title: 'İnternet / Ağ Bağlantısı Hatası',
+          description: 'Yapay zeka sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.',
+          tip: 'İnternet bağlantınızı kontrol edip tekrar deneyin.',
+          raw: msg
+        };
+      }
+
+      if (/cors/i.test(msg)) {
+        return {
+          title: 'Yerel Sunucu CORS Kısıtlaması',
+          description: 'Yerel model sunucusu tarayıcı erişim izni (CORS) vermiyor.',
+          tip: 'LM Studio ayarlarından (Settings > Developer/Server) "Enable CORS" seçeneğini aktif edin.',
+          raw: msg
+        };
+      }
+
+      // 11. Güvenlik Filtresi Engeli
+      if (/safety block|harm_category|safety filter|safety/i.test(msg)) {
+        return {
+          title: 'Güvenlik Filtresi Engeli',
+          description: 'İstek içeriği modelin güvenlik filtrelerine takıldı.',
+          tip: 'İstediğiniz 3D CAD parçasını daha teknik ve standart ölçü terimleriyle tarif edin.',
+          raw: msg
+        };
+      }
+
+      // 12. Fusion 360 / Yerel Köprü
+      if (/yerel web köprüsüne bağlanılamadı|adsk köprüsü mevcut değil|49876/i.test(msg)) {
+        return {
+          title: 'Fusion 360 Bağlantısı Bulunamadı',
+          description: 'Çizimin çalışma alanına gelmesi için Fusion 360 programının açık ve AICADBridge eklentisinin çalışıyor olması gerekir.',
+          tip: 'Fusion 360\'ı açıp Shift+S ile eklentiyi başlatın ya da sağ üstteki "Fusion\'a Bağlan" butonuna tıklayın.',
+          raw: msg
+        };
+      }
+
+      if (/zaman aşımına uğradı|timed out|timeout/i.test(msg)) {
+        return {
+          title: 'İşlem Zaman Aşımına Uğradı',
+          description: 'Sunucu veya Fusion 360 işlemi belirtilen sürede tamamlayamadı.',
+          tip: 'Lütfen tekrar deneyin.',
+          raw: msg
+        };
+      }
+
+      // Varsayılan
+      return {
+        title: `${provName} Hatası`,
+        description: cleanErrorString(msg),
+        tip: 'Lütfen API anahtarınızı veya model seçiminizi kontrol edip tekrar deneyin.',
+        raw: msg
+      };
+    }
+
+    function formatFusionErrorInTurkish(errStr) {
+      if (!errStr) return 'Bilinmeyen CAD çizim hatası.';
+      const s = String(errStr);
+
+      if (/activeProduct|active design|Design\.cast/i.test(s)) {
+        return 'Fusion 360\'ta aktif bir tasarım dokümanı bulunamadı. Yeni bir tasarım açılıyor.';
+      }
+      if (/Kesilecek veya kesi.+ecek hedef g.+vde bulunamad|No target body found to cut or intersect|target body/i.test(s)) {
+        return 'Hedef gövde bulunamadı: Yeni parça mevcut gövdeyle kesişmiyor veya işlem tipi (Cut/Join yerine NewBody) hatalı seçilmiş.';
+      }
+      if (/features\.extrudeFeatures|setDistanceExtent|createInput/i.test(s)) {
+        return 'Katılama (Extrude) işlemi başarısız: Çizilen profilde açık uçlar olabilir veya derinlik değeri geçersiz.';
+      }
+      if (/profiles\.item\(0\)|Index out of range|no profiles/i.test(s)) {
+        return 'Kroki (Sketch) üzerinde kapalı bir alan (profil) bulunamadı. Çizgilerin birleştiğinden emin olunmalı.';
+      }
+      if (/Point not on plane|Plane not valid/i.test(s)) {
+        return 'Çizim düzlemi veya referans yüzey koordinatları geçersiz.';
+      }
+      if (/Value out of range/i.test(s)) {
+        return 'Verilen ölçü değeri Fusion 360 sınırlarının dışında.';
+      }
+      if (/HİÇBİR YENİ 3D KATI GÖVDE|hiçbir yeni 3d katı gövde|katı gövde eklenmedi|KATI GÖVDE/i.test(s)) {
+        return '3D Parça Oluşturulamadı: Kod çalıştırıldı fakat Fusion 360 çalışma alanına yeni bir 3D katı model gövdesi eklenmedi. Yalnızca 2D eskiz çizilmiş veya profil açık kalmış olabilir.';
+      }
+      if (/timed out|zaman aşımı/i.test(s)) {
+        return 'Fusion 360 işlemi 45 saniyede tamamlayamadı (Zaman aşımı).';
+      }
+      return cleanErrorString(s);
+    }
+
+    async function getApiError(response) {
+      try {
+        const d = await response.json();
+        const raw = d?.error?.message || d?.message || `HTTP ${response.status}`;
+        const info = formatErrorInTurkish(raw);
+        return `${info.title}: ${info.description}`;
+      } catch(e) {
+        if (response.status === 401) return 'Yetkisiz erişim: API anahtarınız geçersiz (HTTP 401).';
+        if (response.status === 429) return 'İstek sınırı aşıldı: Lütfen biraz bekleyin (HTTP 429).';
+        if (response.status === 404) return 'Kaynak bulunamadı: Model veya servis mevcut değil (HTTP 404).';
+        if (response.status >= 500) return `Sunucu arızası: Sağlayıcı tarafında hata oluştu (HTTP ${response.status}).`;
+        return `HTTP ${response.status} Hatası`;
+      }
+    }
+
+    // ── Connect button handler ──
+    async function connectProvider() {
+      const provider = state.provider;
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const hint = document.getElementById('apiHint');
+      const btn = document.getElementById('btnConnect');
+
+      if (!apiKey) {
+        hint.textContent = 'API anahtarı boş olamaz.';
+        hint.className = 's-hint err';
+        return;
+      }
+
+      localStorage.setItem('aicad_key_' + provider, apiKey);
+
+      btn.disabled = true;
+      btn.textContent = 'Bağlanıyor...';
+      hint.textContent = 'Modeller getiriliyor...';
+      hint.className = 's-hint';
+
+      const result = await fetchModelsJS(provider, apiKey);
+
+      btn.disabled = false;
+      btn.textContent = 'Bağlan';
+
+      if (result.success && result.models.length > 0) {
+        state.fetchedModels[provider] = result.models;
+        state.connected[provider] = true;
+
+        hint.textContent = `✓ ${result.models.length} model bulundu`;
+        hint.className = 's-hint ok';
+        populateModelSelect(result.models);
+        document.getElementById('modelSection').style.display = 'block';
+        document.getElementById('modelStatusMsg').style.display = 'none';
+        updateModelLabel();
+      } else {
+        state.connected[provider] = false;
+        const errInfo = formatErrorInTurkish(result.error || '', PROVIDERS.find(p => p.id === provider)?.name || provider);
+        hint.textContent = `${errInfo.title} — ${errInfo.description}`;
+        hint.className = 's-hint err';
+        document.getElementById('modelSection').style.display = 'none';
+      }
+    }
+
+    // Legacy handler — if Python sends models (Fusion internal)
+    function onOllamaModels(data) {
+      if (data.success && data.models?.length > 0) {
+        state.ollamaModels = data.models;
+        state.connected['ollama'] = true;
+      }
+      if (state.provider === 'ollama' && document.getElementById('settingsOverlay').classList.contains('visible')) {
+        showProviderSettings('ollama');
+      }
+      updateModelLabel();
+    }
+
+    function onModelsResult(data) {
+      // Legacy handler for Python-sourced models
+      if (data.success && data.models?.length > 0) {
+        state.fetchedModels[data.provider] = data.models;
+        state.connected[data.provider] = true;
+        updateModelLabel();
+      }
+    }
+
+    function populateModelSelect(models) {
+      const sel = document.getElementById('modelSelect');
+      sel.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name;
+        sel.appendChild(opt);
+      });
+
+      // Restore previously selected model
+      const saved = localStorage.getItem('aicad_model');
+      if (saved && models.find(m => m.id === saved)) {
+        sel.value = saved;
+      }
+
+      sel.onchange = () => {
+        state.model = sel.value;
+        state.modelName = sel.selectedOptions[0]?.textContent || sel.value;
+        localStorage.setItem('aicad_model', state.model);
+        localStorage.setItem('aicad_modelName', state.modelName);
+        updateModelLabel();
+      };
+
+      // Trigger initial selection
+      if (sel.value) {
+        state.model = sel.value;
+        state.modelName = sel.selectedOptions[0]?.textContent || sel.value;
+        localStorage.setItem('aicad_model', state.model);
+        localStorage.setItem('aicad_modelName', state.modelName);
+      }
+    }
+
+    // ── Local Model Support Functions ──
+    function setSourceMode(mode) {
+      state.sourceMode = mode;
+      localStorage.setItem('aicad_source_mode', mode);
+
+      const btnCloud = document.getElementById('btnModeCloud');
+      const btnLocal = document.getElementById('btnModeLocal');
+      const cloudSec = document.getElementById('cloudSettingsSection');
+      const localSec = document.getElementById('localSettingsSection');
+
+      if (mode === 'local') {
+        btnLocal?.classList.add('active');
+        btnCloud?.classList.remove('active');
+        if (cloudSec) cloudSec.style.display = 'none';
+        if (localSec) localSec.style.display = 'block';
+
+        const savedBase = localStorage.getItem('aicad_local_base_url') || state.localBaseUrl || 'http://localhost:1234/v1';
+        const savedModel = localStorage.getItem('aicad_local_model') || state.localModel || '';
+        const savedKey = localStorage.getItem('aicad_local_api_key') || state.localApiKey || '';
+
+        const urlInput = document.getElementById('localBaseUrl');
+        const modelInput = document.getElementById('localModelInput');
+        const keyInput = document.getElementById('localApiKey');
+        if (urlInput) urlInput.value = savedBase;
+        if (modelInput) modelInput.value = savedModel;
+        if (keyInput) keyInput.value = savedKey;
+
+      } else {
+        btnCloud?.classList.add('active');
+        btnLocal?.classList.remove('active');
+        if (cloudSec) cloudSec.style.display = 'block';
+        if (localSec) localSec.style.display = 'none';
+        showProviderSettings(state.provider);
+      }
+      updateModelLabel();
+    }
+
+    function applyLocalPreset(preset) {
+      const urlInput = document.getElementById('localBaseUrl');
+      document.querySelectorAll('.local-chip').forEach(c => c.classList.remove('active'));
+
+      if (preset === 'lmstudio') {
+        if (urlInput) urlInput.value = 'http://127.0.0.1:1234/v1';
+        document.getElementById('chipLmStudio')?.classList.add('active');
+      } else if (preset === 'ollama') {
+        if (urlInput) urlInput.value = 'http://127.0.0.1:11434/v1';
+        document.getElementById('chipOllama')?.classList.add('active');
+      } else if (preset === 'llamacpp') {
+        if (urlInput) urlInput.value = 'http://127.0.0.1:8080/v1';
+        document.getElementById('chipLlamaCpp')?.classList.add('active');
+      }
+      const box = document.getElementById('localStatusBox');
+      if (box) box.style.display = 'none';
+    }
+
+    async function fetchLocalModelsNetwork(baseUrl, apiKey) {
+      let cleanUrl = (baseUrl || 'http://127.0.0.1:1234/v1').trim().replace(/\/+$/, '');
+      const modelsUrl = cleanUrl.endsWith('/models') ? cleanUrl : `${cleanUrl}/models`;
+
+      // 1. ÖNCELİK: Fusion 360 Dahili Python Köprüsü (CORS kısıtlamasından tamamen muaftır ve doğrudan bağlanır)
+      if (typeof adsk !== 'undefined' && adsk.fusionSendData) {
+        try {
+          const pyRes = await sendToFusionAsync('fetchModels', {
+            provider: 'local',
+            baseUrl: cleanUrl,
+            apiKey: apiKey || ''
+          });
+          if (pyRes && pyRes.success && Array.isArray(pyRes.models) && pyRes.models.length > 0) {
+            return pyRes;
+          }
+          // Eğer localhost ile denendiyse 127.0.0.1 ile bir kez daha dene
+          if (cleanUrl.includes('localhost')) {
+            const altUrl = cleanUrl.replace('localhost', '127.0.0.1');
+            const pyRes2 = await sendToFusionAsync('fetchModels', {
+              provider: 'local',
+              baseUrl: altUrl,
+              apiKey: apiKey || ''
+            });
+            if (pyRes2 && pyRes2.success && Array.isArray(pyRes2.models) && pyRes2.models.length > 0) {
+              return pyRes2;
+            }
+          }
+          if (pyRes && pyRes.error) {
+            console.warn('Python fetchModels hatası:', pyRes.error);
+          }
+        } catch(pyErr) {
+          console.warn('Python fetchModels çağrısı başarısız:', pyErr);
+        }
+      }
+
+      // 2. Harici Web Köprüsü (127.0.0.1:49876)
+      try {
+        const r = await fetch('http://127.0.0.1:49876/fetch_models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'local', baseUrl: cleanUrl, apiKey: apiKey || '' }),
+          signal: AbortSignal.timeout(4000)
+        });
+        if (r.ok) {
+          const res = await r.json();
+          if (res && res.success && Array.isArray(res.models) && res.models.length > 0) return res;
+        }
+      } catch(e) {}
+
+      // 3. Doğrudan Tarayıcı Fetch Denemesi (CORS açıksa)
+      const tryUrls = [modelsUrl];
+      if (modelsUrl.includes('localhost')) {
+        tryUrls.push(modelsUrl.replace('localhost', '127.0.0.1'));
+      }
+      for (const targetUrl of tryUrls) {
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 3000);
+          const headers = { 'Content-Type': 'application/json' };
+          if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+          const res = await fetch(targetUrl, { headers, signal: ctrl.signal });
+          clearTimeout(tid);
+
+          if (res.ok) {
+            const d = await res.json();
+            const list = (d.data || d.models || []).map(m => {
+              const id = m.id || m.name || '';
+              return { id, name: id };
+            }).filter(m => m.id);
+            if (list.length > 0) return { success: true, models: list };
+          }
+        } catch(directErr) {}
+      }
+
+      return {
+        success: false,
+        error: `Yerel sunucuya (${cleanUrl}) ulaşılamadı. Sunucunun açık olduğundan ve model yüklendiğinden emin olun.`
+      };
+    }
+
+    async function testLocalConnectionUI() {
+      const btn = document.getElementById('btnTestLocal');
+      const statusBox = document.getElementById('localStatusBox');
+      const urlInput = document.getElementById('localBaseUrl');
+      const keyInput = document.getElementById('localApiKey');
+
+      const baseUrl = (urlInput?.value || '').trim() || 'http://127.0.0.1:1234/v1';
+      const apiKey = (keyInput?.value || '').trim();
+
+      if (btn) btn.disabled = true;
+      if (statusBox) {
+        statusBox.className = 'local-status-box testing';
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = `<span>⏳ <b>${esc(baseUrl)}</b> adresine bağlanılıyor...</span>`;
+      }
+
+      try {
+        const result = await fetchLocalModelsNetwork(baseUrl, apiKey);
+        if (btn) btn.disabled = false;
+
+        if (result.success) {
+          state.localConnected = true;
+          const count = result.models?.length || 0;
+          let info = `✅ <b>Bağlantı başarılı!</b> Yerel model sunucusu aktif ve yanıt veriyor.`;
+          if (count > 0) {
+            info += `<br><span style="font-size:11.5px;color:#a7f3d0;">✓ ${count} adet model tespit edildi. Aşağıdaki açılır listeden seçim yapabilirsiniz.</span>`;
+            populateLocalModelDropdown(result.models);
+          } else {
+            info += `<br><span style="font-size:11.5px;color:#fef08a;">⚠️ Sunucuda şu an yüklü model görünmüyor. LM Studio / Ollama'da model yükleyin veya adını elle girin.</span>`;
+          }
+          statusBox.className = 'local-status-box success';
+          statusBox.innerHTML = info;
+        } else {
+          state.localConnected = false;
+          statusBox.className = 'local-status-box error';
+          statusBox.innerHTML = `
+            <div>❌ <b>Bağlanılamadı:</b> ${esc(result.error || 'Sunucuya erişilemedi')}</div>
+            <div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(231,76,60,0.3);font-size:11px;color:#ffcdd2;line-height:1.45;">
+              <b>Olası Nedenler & Kontrol Edilecekler:</b>
+              <ul style="margin:4px 0 0 16px;padding:0;">
+                <li>LM Studio veya Ollama uygulamasının açık ve yerel sunucusunun (Start Server) çalışır durumda olduğunu kontrol edin.</li>
+                <li>Base URL adresinin doğru olduğunu kontrol edin (LM Studio: <code>http://127.0.0.1:1234/v1</code>, Ollama: <code>http://127.0.0.1:11434/v1</code>).</li>
+                <li>Yerel sunucuda en az bir yapay zeka modelinin yüklü (loaded) olduğundan emin olun.</li>
+              </ul>
+            </div>
+          `;
+        }
+      } catch(err) {
+        if (btn) btn.disabled = false;
+        state.localConnected = false;
+        statusBox.className = 'local-status-box error';
+        statusBox.innerHTML = `❌ <b>Bağlanılamadı:</b> ${esc(err.message || 'Bağlantı hatası')}`;
+      }
+    }
+
+    async function fetchLocalModelsUI() {
+      const urlInput = document.getElementById('localBaseUrl');
+      const keyInput = document.getElementById('localApiKey');
+      const btn = document.getElementById('btnFetchLocalModels');
+      const hint = document.getElementById('localModelHint');
+
+      const baseUrl = (urlInput?.value || '').trim() || 'http://127.0.0.1:1234/v1';
+      const apiKey = (keyInput?.value || '').trim();
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Getiriliyor...';
+      }
+      if (hint) {
+        hint.textContent = 'Modeller taranıyor...';
+        hint.style.color = '#00e5ff';
+      }
+
+      const res = await fetchLocalModelsNetwork(baseUrl, apiKey);
+
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Modelleri Listele';
+      }
+
+      if (res.success && res.models?.length > 0) {
+        populateLocalModelDropdown(res.models);
+        if (hint) {
+          hint.textContent = `✓ ${res.models.length} model listelendi, birini seçebilirsiniz.`;
+          hint.style.color = '#2ecc71';
+        }
+      } else {
+        if (hint) {
+          hint.textContent = res.error || 'Model bulunamadı veya sunucu kapalı.';
+          hint.style.color = '#ff6b6b';
+        }
+      }
+    }
+
+
+    function populateLocalModelDropdown(models) {
+      const select = document.getElementById('localModelSelect');
+      const input = document.getElementById('localModelInput');
+      if (!select) return;
+
+      select.innerHTML = '<option value="">-- Sunucudaki Modellerden Birini Seçin --</option>';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.name || m.id;
+        select.appendChild(opt);
+      });
+      select.style.display = 'block';
+
+      const currentVal = input?.value || localStorage.getItem('aicad_local_model') || '';
+      if (currentVal && models.some(m => m.id === currentVal)) {
+        select.value = currentVal;
+      } else if (models.length > 0 && !input?.value) {
+        select.value = models[0].id;
+        if (input) input.value = models[0].id;
+      }
+    }
+
+    function onLocalModelSelected(val) {
+      const input = document.getElementById('localModelInput');
+      if (input && val) {
+        input.value = val;
+      }
+    }
+
+    function saveAndApplyLocalSettings() {
+      const urlInput = document.getElementById('localBaseUrl');
+      const modelInput = document.getElementById('localModelInput');
+      const keyInput = document.getElementById('localApiKey');
+      const statusBox = document.getElementById('localStatusBox');
+
+      const baseUrl = (urlInput?.value || '').trim() || 'http://localhost:1234/v1';
+      const model = (modelInput?.value || '').trim();
+      const apiKey = (keyInput?.value || '').trim();
+
+      state.sourceMode = 'local';
+      state.localBaseUrl = baseUrl;
+      state.localModel = model;
+      state.localApiKey = apiKey;
+      state.localConnected = true;
+
+      localStorage.setItem('aicad_source_mode', 'local');
+      localStorage.setItem('aicad_local_base_url', baseUrl);
+      localStorage.setItem('aicad_local_model', model);
+      localStorage.setItem('aicad_local_api_key', apiKey);
+
+      updateModelLabel();
+
+      if (statusBox) {
+        statusBox.className = 'local-status-box success';
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = `💾 <b>Ayarlar kaydedildi!</b> Artık CAD modelleme istekleri yerel yapay zeka modelinize (<code>${esc(baseUrl)}</code>) gönderilecek.`;
+      }
+
+      setTimeout(() => {
+        closeSettings();
+      }, 1000);
+    }
+
+    // ── Model label ──
+    function updateModelLabel() {
+      const label = document.getElementById('currentModelLabel');
+      if (!label) return;
+
+      if (state.sourceMode === 'local') {
+        const localMod = state.localModel || localStorage.getItem('aicad_local_model') || '';
+        if (localMod) {
+          const shortName = localMod.length > 28 ? localMod.substring(0, 26) + '…' : localMod;
+          label.textContent = `🖥️ Local · ${shortName}`;
+        } else {
+          label.textContent = `🖥️ Local · Model Seçilmedi`;
+        }
+        return;
+      }
+
+      const prov = PROVIDERS.find(p => p.id === state.provider);
+      if (!state.connected[state.provider]) {
+        label.textContent = prov ? prov.name + ' · Bağlı değil' : 'Ayarlardan model seçin';
+        return;
+      }
+
+      if (state.modelName && state.model) {
+        const shortName = state.modelName.length > 30 ? state.modelName.substring(0, 28) + '…' : state.modelName;
+        label.textContent = `${prov?.name || state.provider} · ${shortName}`;
+      } else {
+        label.textContent = prov ? prov.name : 'Model seçin';
+      }
+    }
+
+    // ── Settings panel ──
+    function openSettings() {
+      const currentMode = state.sourceMode || localStorage.getItem('aicad_source_mode') || 'cloud';
+      setSourceMode(currentMode);
+      document.getElementById('settingsOverlay').classList.add('visible');
+    }
+    function closeSettings() {
+      document.getElementById('settingsOverlay').classList.remove('visible');
+      updateModelLabel();
+    }
+
+    // ── Chat & Conversation State ──
+    let conversationHistory = [];
+    let attachedImage = null; // { dataUrl, base64, mimeType, name }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+    function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateCAD(); } }
+
+    function addMsg(role, html) {
+      document.getElementById('welcomeScreen').classList.add('hidden');
+      const c = document.getElementById('messagesContainer');
+      const d = document.createElement('div');
+      d.className = 'msg';
+      const isAI = role === 'ai';
+      d.innerHTML = `
+        <div class="msg-avatar ${isAI?'ai':'user'}">${isAI?'✦':'Y'}</div>
+        <div class="msg-body">
+          <div class="msg-name">${isAI?'AI CAD Studio':'Sen'}</div>
+          <div class="msg-content">${html}</div>
+        </div>`;
+      c.appendChild(d);
+      scrollBottom();
+      return d;
+    }
+
+    function addTyping() {
+      document.getElementById('welcomeScreen').classList.add('hidden');
+      const c = document.getElementById('messagesContainer');
+      const d = document.createElement('div');
+      d.className = 'msg'; d.id = 'typingMsg';
+      d.innerHTML = `<div class="msg-avatar ai">✦</div><div class="msg-body"><div class="msg-name">AI CAD Studio</div><div class="msg-content"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
+      c.appendChild(d);
+      scrollBottom();
+    }
+
+    function removeTyping() { const t = document.getElementById('typingMsg'); if (t) t.remove(); }
+    function scrollBottom() { const a = document.getElementById('chatArea'); requestAnimationFrame(() => a.scrollTop = a.scrollHeight); }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // Lightweight Markdown to HTML formatter
+    function formatMarkdown(text) {
+      if (!text) return '';
+      let s = esc(text);
+
+      // Bold: **text** or __text__
+      s = s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+      // Italic: *text* or _text_
+      s = s.replace(/(^|[^\*])\*([^\*]+)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+
+      // Inline code: `code`
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Line by line processing for lists and paragraphs
+      const lines = s.split('\n');
+      let inUl = false;
+      let inOl = false;
+      let html = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Bullet list: - or * or •
+        if (/^[-*•]\s+(.*)/.test(line)) {
+          if (!inUl) {
+            if (inOl) { html += '</ol>'; inOl = false; }
+            html += '<ul>';
+            inUl = true;
+          }
+          html += `<li>${line.replace(/^[-*•]\s+/, '')}</li>`;
+        }
+        // Numbered list: 1. or 1)
+        else if (/^\d+[\.\)]\s+(.*)/.test(line)) {
+          if (!inOl) {
+            if (inUl) { html += '</ul>'; inUl = false; }
+            html += '<ol>';
+            inOl = true;
+          }
+          html += `<li>${line.replace(/^\d+[\.\)]\s+/, '')}</li>`;
+        }
+        else {
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (inOl) { html += '</ol>'; inOl = false; }
+
+          if (line === '') {
+            html += '<div style="height:6px;"></div>';
+          } else {
+            html += `<p>${line}</p>`;
+          }
+        }
+      }
+      if (inUl) html += '</ul>';
+      if (inOl) html += '</ol>';
+
+      return html;
+    }
+
+    // Code preview toggle
+    function toggleCodeView(header) {
+      const body = header.nextElementSibling;
+      const arrow = header.querySelector('.code-toggle-arrow');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        if (arrow) arrow.textContent = '▲';
+      } else {
+        body.style.display = 'none';
+        if (arrow) arrow.textContent = '▼';
+      }
+    }
+
+    // ── Image Attachment Handling ──
+    function handleImageSelect(e) {
+      const file = e.target.files?.[0];
+      if (file) processImageFile(file);
+      e.target.value = '';
+    }
+
+    function processImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WEBP vb.)');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const base64 = dataUrl.split(',')[1];
+        setAttachedImage({
+          dataUrl,
+          base64,
+          mimeType: file.type || 'image/png',
+          name: file.name || 'referans_gorsel.png'
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function setAttachedImage(imgObj) {
+      attachedImage = imgObj;
+      const tray = document.getElementById('imagePreviewTray');
+      const thumb = document.getElementById('imagePreviewThumb');
+      const nameEl = document.getElementById('imagePreviewName');
+      if (tray && thumb && nameEl) {
+        thumb.src = imgObj.dataUrl;
+        nameEl.textContent = imgObj.name;
+        tray.style.display = 'flex';
+      }
+    }
+
+    function removeAttachedImage() {
+      attachedImage = null;
+      const tray = document.getElementById('imagePreviewTray');
+      if (tray) tray.style.display = 'none';
+      const input = document.getElementById('imageFileInput');
+      if (input) input.value = '';
+    }
+
+    // Clipboard paste support (Ctrl+V)
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || window.clipboardData)?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processImageFile(file);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    });
+
+    // Drag & Drop support
+    ['dragenter', 'dragover'].forEach(name => {
+      window.addEventListener(name, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.type.startsWith('image/')) {
+          processImageFile(file);
+        }
+      }
+    }, false);
+
+    function sendQuick(t) { document.getElementById('promptInput').value = t; generateCAD(); }
+    function sendContinuation(partDescription) {
+      const prompt = `Harika, tasarıma devam et! Mevcut modelin üzerine ${partDescription} ekle. Kesinlikle soru sorma veya seçenek sunma; doğrudan Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret ve NewBodyFeatureOperation kullanarak parçayı ekle.`;
+      document.getElementById('promptInput').value = prompt;
+      generateCAD();
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // CADAM-İLHAMLI ÖZELLİK 1: Konuşma Geçmişi Yöneticisi
+    // ═══════════════════════════════════════════════════════════════
+    const CONV_STORAGE_KEY = 'aicad_conversations';
+    let currentConvId = null;
+    let conversations = {};  // { id: { id, title, history, createdAt, updatedAt } }
+
+    function loadConversations() {
+      try {
+        const raw = localStorage.getItem(CONV_STORAGE_KEY);
+        if (raw) conversations = JSON.parse(raw);
+      } catch(e) {
+        conversations = {};
+      }
+    }
+
+    function saveConversations() {
+      try {
+        localStorage.setItem(CONV_STORAGE_KEY, JSON.stringify(conversations));
+      } catch(e) {
+        console.warn('Konuşmalar kaydedilemedi:', e);
+      }
+    }
+
+    function generateConvId() {
+      return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    }
+
+    function saveCurrentConversation() {
+      if (!currentConvId || conversationHistory.length === 0) return;
+      const existing = conversations[currentConvId] || {};
+      const firstMsg = conversationHistory.find(m => m.role === 'user');
+      const title = firstMsg?.text?.substring(0, 42) || 'Yeni Konuşma';
+      conversations[currentConvId] = {
+        id: currentConvId,
+        title: title.replace(/\n/g, ' '),
+        history: conversationHistory,
+        createdAt: existing.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
+      saveConversations();
+      renderConvList();
+    }
+
+    function renderConvList() {
+      const list = document.getElementById('convList');
+      if (!list) return;
+      list.innerHTML = '';
+      // Sort by updatedAt descending
+      const sorted = Object.values(conversations).sort((a,b) => b.updatedAt - a.updatedAt);
+      if (sorted.length === 0) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-3);padding:6px 4px;">Henüz konuşma yok</div>';
+        return;
+      }
+      sorted.forEach(conv => {
+        const item = document.createElement('div');
+        item.className = 'conv-item' + (conv.id === currentConvId ? ' active' : '');
+        item.innerHTML = `
+          <span class="conv-item-icon">💬</span>
+          <span class="conv-item-name" title="${esc(conv.title)}">${esc(conv.title)}</span>
+          <button class="conv-item-del" onclick="event.stopPropagation();deleteConversation('${conv.id}')" title="Sil">✕</button>
+        `;
+        item.onclick = () => loadConversation(conv.id);
+        list.appendChild(item);
+      });
+    }
+
+    function loadConversation(id) {
+      const conv = conversations[id];
+      if (!conv) return;
+      // Save current first
+      saveCurrentConversation();
+      currentConvId = id;
+      conversationHistory = conv.history || [];
+      // Re-render messages
+      const container = document.getElementById('messagesContainer');
+      container.innerHTML = '';
+      document.getElementById('welcomeScreen').classList.add('hidden');
+      conversationHistory.forEach(msg => {
+        if (msg.role === 'user') {
+          let html = msg.image ? `<img src="${msg.image.dataUrl || ''}" class="msg-attached-img" alt="Referans">` : '';
+          html += `<div>${esc(msg.text || '')}</div>`;
+          addMsg('user', html);
+        } else if (msg.role === 'assistant') {
+          addMsg('ai', formatMarkdown(cleanExplanationText(msg.text || '')));
+        }
+      });
+      renderConvList();
+    }
+
+    function deleteConversation(id) {
+      delete conversations[id];
+      saveConversations();
+      if (id === currentConvId) {
+        startNewChat();
+      } else {
+        renderConvList();
+      }
+    }
+
+    function startNewChat() {
+      // Save current before clearing
+      saveCurrentConversation();
+      currentConvId = generateConvId();
+      conversationHistory = [];
+      removeAttachedImage();
+      document.getElementById('messagesContainer').innerHTML = '';
+      document.getElementById('welcomeScreen').classList.remove('hidden');
+      document.getElementById('promptInput').value = '';
+      renderConvList();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CADAM-İLHAMLI ÖZELLİK 2: Thinking Mode Toggle
+    // ═══════════════════════════════════════════════════════════════
+    let thinkingMode = localStorage.getItem('aicad_thinking_mode') === 'true';
+
+    function applyThinkingUI() {
+      const btn = document.getElementById('btnThinking');
+      const lbl = document.getElementById('thinkingLabel');
+      const panel = document.getElementById('thinkingTogglePanel');
+      if (thinkingMode) {
+        if (btn) { btn.style.color = '#00e5ff'; btn.style.borderColor = 'rgba(0,184,212,.5)'; btn.style.background = 'rgba(0,184,212,.1)'; }
+        if (lbl) lbl.textContent = 'Düşünce ✓';
+        if (panel) panel.classList.add('active');
+      } else {
+        if (btn) { btn.style.color = '#888'; btn.style.borderColor = 'transparent'; btn.style.background = 'transparent'; }
+        if (lbl) lbl.textContent = 'Düşünce';
+        if (panel) panel.classList.remove('active');
+      }
+    }
+
+    function toggleThinking() {
+      thinkingMode = !thinkingMode;
+      localStorage.setItem('aicad_thinking_mode', thinkingMode);
+      applyThinkingUI();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CADAM-İLHAMLI ÖZELLİK 3: View Switcher (Chat / Parametric)
+    // ═══════════════════════════════════════════════════════════════
+    function switchView(view) {
+      const chatView = document.getElementById('viewChat');
+      const paramView = document.getElementById('viewParam');
+      const tabChat = document.getElementById('tabChat');
+      const tabParam = document.getElementById('tabParam');
+      if (view === 'chat') {
+        chatView.style.display = 'flex';
+        paramView.style.display = 'none';
+        tabChat.classList.add('active');
+        tabParam.classList.remove('active');
+      } else {
+        chatView.style.display = 'none';
+        paramView.style.display = 'flex';
+        tabChat.classList.remove('active');
+        tabParam.classList.add('active');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Sidebar Toggle
+    // ═══════════════════════════════════════════════════════════════
+    let sidebarExpanded = false;
+    function toggleSidebar() {
+      sidebarExpanded = !sidebarExpanded;
+      const sidebar = document.getElementById('mainSidebar');
+      if (sidebarExpanded) {
+        sidebar.classList.add('expanded');
+        renderConvList();
+      } else {
+        sidebar.classList.remove('expanded');
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CADAM-İLHAMLI ÖZELLİK 4: Parametrik Modelleme Modu
+    // ═══════════════════════════════════════════════════════════════
+    let paramState = {
+      isGenerating: false,
+      params: {},      // { name: { value, min, max, unit, step } }
+      baseCode: '',    // Template code with __PARAM_NAME__ placeholders
+      debounceTimer: null
+    };
+
+    const PARAM_SYSTEM_PROMPT = `You are a Fusion 360 parametric CAD code generator.
+The user will describe a 3D part. You must:
+1. Generate Fusion 360 Python API code with NAMED PARAMETER placeholders in the form __PARAM_NAME__ (all caps, underscores).
+2. Return a JSON object with this exact structure:
+{
+  "code": "import adsk.core, adsk.fusion, math\n# ... full fusion 360 python code with __PARAM_NAME__ placeholders ...",
+  "params": {
+    "DIAMETER_MM": { "value": 40, "min": 5, "max": 200, "step": 1, "unit": "mm", "label": "Çap" },
+    "HEIGHT_MM": { "value": 60, "min": 5, "max": 300, "step": 1, "unit": "mm", "label": "Yükseklik" }
+  }
+}
+Rules:
+- ALL dimension variables must be parameters with __PARAM_NAME__ placeholders.
+- The code MUST create a 3D solid body using extrudes.add() with NewBodyFeatureOperation.
+- Fusion 360 uses CENTIMETERS internally: convert mm→cm by dividing by 10.
+- Parameters in code are in mm (user-facing); in the code multiply by 0.1 to get cm.
+- ONLY return valid JSON, no markdown, no explanation.`;
+
+    async function generateParametric() {
+      const prompt = document.getElementById('paramPrompt')?.value?.trim();
+      if (!prompt) return;
+      const isLocalMode = state.sourceMode === 'local';
+      const activeProvider = isLocalMode ? 'local' : state.provider;
+      const activeModel = isLocalMode ? (state.localModel || localStorage.getItem('aicad_local_model') || '') : state.model;
+      const activeApiKey = isLocalMode ? (state.localApiKey || localStorage.getItem('aicad_local_api_key') || '') : (localStorage.getItem('aicad_key_' + state.provider) || '');
+      const activeBaseUrl = isLocalMode ? (state.localBaseUrl || localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1') : null;
+
+      if (!activeModel && !isLocalMode) {
+        setParamStatus('❌ Önce Ayarlar\'dan bir model seçin.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnParamGen');
+      if (btn) btn.disabled = true;
+      paramState.isGenerating = true;
+      setParamStatus('🧠 Parametrik yapı analiz ediliyor...', 'running');
+
+      try {
+        // Build message for parametric generation
+        const messages = [
+          { role: 'user', text: `Parametrik Fusion 360 kodu oluştur: ${prompt}` }
+        ];
+
+        const raw = await callLLM(activeProvider, activeModel, messages, activeApiKey, null, activeBaseUrl);
+
+        // Try to parse JSON from response
+        let parsed = null;
+        try {
+          // Extract JSON from response (may be wrapped in ```json ... ```)
+          const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || [null, raw];
+          parsed = JSON.parse(jsonMatch[1]);
+        } catch(e) {
+          // Try direct parse
+          try { parsed = JSON.parse(raw); } catch(e2) {
+            setParamStatus('❌ Model parametrik JSON döndürmedi. Normal chat modunda deneyin.', 'error');
+            return;
+          }
+        }
+
+        if (!parsed?.code || !parsed?.params) {
+          setParamStatus('❌ Geçersiz parametrik yanıt.', 'error');
+          return;
+        }
+
+        paramState.baseCode = parsed.code;
+        paramState.params = {};
+        Object.entries(parsed.params).forEach(([k, v]) => {
+          paramState.params[k] = { ...v, currentValue: v.value };
+        });
+
+        renderParamSliders();
+        await applyParamCode();
+        setParamStatus('✅ Parametrik model oluşturuldu! Sliderları kaydırarak anlık değiştir.', 'success');
+
+      } catch(err) {
+        setParamStatus(`❌ Hata: ${err.message}`, 'error');
+      } finally {
+        paramState.isGenerating = false;
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function renderParamSliders() {
+      const container = document.getElementById('paramSlidersContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      container.style.display = 'flex';
+
+      Object.entries(paramState.params).forEach(([key, p]) => {
+        const group = document.createElement('div');
+        group.className = 'param-slider-group';
+        group.innerHTML = `
+          <div class="param-slider-label">
+            <span class="param-slider-name">${esc(p.label || key)}</span>
+            <span class="param-slider-val" id="paramVal_${key}">${p.currentValue} ${p.unit || 'mm'}</span>
+          </div>
+          <input type="range" class="param-slider-input" id="paramSlider_${key}"
+            min="${p.min}" max="${p.max}" step="${p.step || 1}" value="${p.currentValue}"
+            oninput="onParamSliderChange('${key}', this.value)">
+        `;
+        container.appendChild(group);
+      });
+    }
+
+    function onParamSliderChange(key, value) {
+      const numVal = parseFloat(value);
+      if (paramState.params[key]) paramState.params[key].currentValue = numVal;
+      const valEl = document.getElementById('paramVal_' + key);
+      if (valEl) valEl.textContent = numVal + ' ' + (paramState.params[key]?.unit || 'mm');
+      // Debounce apply
+      clearTimeout(paramState.debounceTimer);
+      paramState.debounceTimer = setTimeout(() => applyParamCode(), 400);
+    }
+
+    async function applyParamCode() {
+      if (!paramState.baseCode) return;
+      // Replace all __PARAM_NAME__ with current values
+      let code = paramState.baseCode;
+      Object.entries(paramState.params).forEach(([key, p]) => {
+        const regex = new RegExp('__' + key + '__', 'g');
+        code = code.replace(regex, p.currentValue);
+      });
+      setParamStatus('⚙️ Fusion 360\'a gönderiliyor...', 'running');
+      const res = await sendToFusionAsync('executeCADCode', { code });
+      if (res?.success) {
+        setParamStatus('✅ Güncellendi.', 'success');
+        getCurrentDesignState().then(st => updateWorkspaceStatusBadge(st)).catch(() => {});
+      } else if (res?.devMode) {
+        setParamStatus('⚠️ Fusion 360 bağlı değil. Kodu üretildi ama çalıştırılamadı.', 'error');
+      } else {
+        setParamStatus(`❌ ${res?.error || 'Çizim hatası'}`, 'error');
+      }
+    }
+
+    function setParamStatus(msg, type) {
+      const el = document.getElementById('paramStatus');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'param-status' + (type ? ' ' + type : '');
+    }
+
+
+
+    // ── CAD Code Generation & Conversational Engine ──
+
+    const SYSTEM_PROMPT = `You are "AI CAD Studio", an autonomous Autodesk Fusion 360 3D Modeling Engineer and Copilot.
+You converse fluently and naturally in Turkish (or the user's language).
+
+CRITICAL ARCHITECTURAL RULES:
+
+1. THE USER DOES NOT RUN SCRIPTS - NEVER OUTPUT EXECUTION INSTRUCTIONS:
+   - The user is an end-user / designer, NOT a programmer.
+   - The user will NEVER manually run code, copy-paste scripts, or open menus.
+   - Our system automatically extracts your Python code and runs it directly in Autodesk Fusion 360 behind the scenes!
+   - STRICT BAN: NEVER write "Nasıl Çalıştırılır?", "Scripts and Add-ins", "Alt+Shift+F", "My Scripts", "Create", "Run butonuna basın", or any instructions telling the user to copy/paste/execute code.
+   - Simply explain the 3D design features and steps conversationally.
+
+2. PROJE ANLAMA VE SORU SORMA PRENSİBİ (WHEN TO ASK QUESTIONS):
+   - NE ZAMAN SORU SORULMALI:
+     * Kullanıcı genel, belirsiz veya fikir alma amaçlı bir taleple geldiğinde (örneğin "aklımda bir proje var", "uçak yapmak istiyorum ama nasıl yapsam?", "bir şey tasarlayalım"):
+       Projeyi tam olarak anlamak, fikir alışverişi yapmak ve projeyi sağlam bir temel üzerine inşa etmek için 1-2 kısa, net ve amaca yönelik soru sor (Örn: "Nasıl bir uçak tipi düşünüyorsun: Yolcu uçağı mı, savaş jeti mi, planör mü? Özel bir ölçü var mı yoksa standart ölçülerle ben mi başlayayım?").
+   - NE ZAMAN SORU SORULMAMALI (KESİNTİSİZ MODELLEME):
+     * Kullanıcı doğrudan "uçak yap", "4 ayaklı masa çiz", "drone modelle", "devam et", "sıradaki adımı yap", "sen karar ver ve başla" gibi net bir talimat verdiğinde ASLA durup retorik soru sorma ("şunu mu ekleyelim bunu mu?" gibi vakit kaybettirme)!
+     * Derhal tam donanımlı Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret ve modeli inşa et!
+
+3. BİR İŞE BAŞLADIĞINDA O İŞİ BİTİRENE KADAR DEVAM ET (COMPLETE & ROBUST MODELING):
+   - Bir tasarım talep edildiğinde, gereksiz yere yarım bırakıp durma!
+   - Modeli temel ve ana bileşenleriyle bir bütün olarak (örneğin uçaksa: aerodinamik gövde, ana kanatlar, kuyruk dengeliyicileri ve motorlar; masaysa: tabla ve 4 ayak) eksiksiz ve orantılı bir katı model olarak oluştur!
+   - Parçaları sadece tek bir izole silindir yapıp bırakma; ana hatlarıyla bitmiş, tanınabilir 3D bir nesne oluştur.
+   - Kullanıcı devam etmesini istediğinde de sıradaki mantıklı detay parçayı doğrudan modelle.
+
+4. FUSION 360 PYTHON API CRITICAL RULES:
+   - INTERNAL UNITS: Fusion 360 API internally uses CENTIMETERS (cm) for ALL linear dimensions.
+     * 1 mm = 0.1 cm
+     * 10 mm = 1.0 cm
+     * 50 mm = 5.0 cm
+     * 100 mm = 10.0 cm
+     Always convert mm to cm in your code coordinates and extrusions!
+   - IMPORTS: Always import adsk.core, adsk.fusion, math.
+   - ACCESS ROOT COMPONENT:
+     app = adsk.core.Application.get()
+     design = adsk.fusion.Design.cast(app.activeProduct)
+     rootComp = design.rootComponent
+
+   - MANDATORY 3D SOLID CREATION (Extrude / Katılama Kesinlikle Zorunludur):
+     CRITICAL: Every generated script MUST finish by creating 3D solid geometry (using extrudes.add with NewBodyFeatureOperation).
+     NEVER output code that only draws a 2D sketch without extruding it into a 3D solid body!
+     A 2D sketch alone has no 3D volume, is invisible to the user, and is considered an absolute failure.
+     
+     * Standard Extrude (Single Profile):
+       extrudes = rootComp.features.extrudeFeatures
+       prof = sketch.profiles.item(0)
+       extInput = extrudes.createInput(prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+       extInput.setDistanceExtent(False, adsk.core.ValueInput.createByReal(height_in_cm))
+       extrudes.add(extInput)
+
+     * Multiple Profiles (e.g. Twin Engines, Landing Gear Wheels, Dual Wings):
+       extrudes = rootComp.features.extrudeFeatures
+       for i in range(sketch.profiles.count):
+           p = sketch.profiles.item(i)
+           extInput = extrudes.createInput(p, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+           extInput.setDistanceExtent(False, adsk.core.ValueInput.createByReal(height_in_cm))
+           extrudes.add(extInput)
+
+   - Ensure the code runs independently and robustly.
+
+5. EXISTING DESIGN INSPECTION & CONTINUATION:
+   - When the user asks to continue, modify, or add features ("kaldığın yerden devam et", "mevcut tasarımı oku", "kanatları ekle"):
+   - Read the [MEVCUT FUSION 360 TASARIM DURUMU] provided in the prompt context carefully.
+   - Inspect the existing body names, bounding boxes [minPoint, maxPoint in mm], and dimensions.
+   - Always align and position your new sketches and features accurately relative to these existing body coordinates.
+   - CRITICAL SAFETY RULE: ALWAYS use 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' when adding new solid parts or features to an existing design!
+   - STRICT BAN: NEVER use 'CutFeatureOperation' or 'JoinFeatureOperation' on empty space or when the extrude does not physically intersect a body, as this causes the fatal crash "RuntimeError: 3 : Kesilecek veya kesişecek hedef gövde bulunamadı!".
+   - STRICT BAN: NEVER write ui.messageBox(...) or except: ui.messageBox(...) in the generated Python code!
+   - STRICT BAN: NEVER catch exceptions and swallow them (except: pass or except: print(e)). Let exceptions raise normally so the automatic Self-Healing system can repair them!
+
+6. DİNAMİK VE İLGİLİ ÖNERİLER (DYNAMIC SUGGESTIONS):
+   - Her yanıtının en sonuna, SADECE o an tasarlanan veya konuşulan projeye özel 2-3 adet mantıklı sonraki adım veya fikir önerisi ekle:
+     Biçim: [ÖNERİLER: Öneri 1 | Öneri 2 | Öneri 3]
+     Örnek (Uçak için): [ÖNERİLER: Jet motorlarını ekle | Kanat uçlarına winglet koy | Kokpit kanopisini detaylandır]
+     Örnek (Masa için): [ÖNERİLER: Çekmece ekle | Kenarları yuvarlatılmış yap | Ayaklara destek çıtası koy]
+     Örnek (Soru sorma aşamasında): [ÖNERİLER: Standart ölçülerle başla | Ölçüleri ben vereyim | Sen karar ver ve modelle]`;
+
+    function cleanExplanationText(text) {
+      if (!text) return '';
+      let cleaned = text;
+      // Remove "Nasıl Çalıştırılır", "How to run", "Scripts and Add-ins" sections
+      cleaned = cleaned.replace(/###?\s*(?:Nasıl Çalıştırılır|Nasıl Kullanılır|Kurulum|Çalıştırma|How to run)[\s\S]*?(?=(?:###|$))/gi, '');
+      // Remove [ÖNERİLER: ...] or [SUGGESTIONS: ...] tags
+      cleaned = cleaned.replace(/\[(?:ÖNERİLER|SUGGESTIONS|ONERILER):[^\]]*\]/gi, '');
+      const lines = cleaned.split('\n');
+      const filtered = lines.filter(line => {
+        const lower = line.toLowerCase();
+        return !lower.includes('scripts and add-ins') &&
+               !lower.includes('alt + shift + f') &&
+               !lower.includes('alt+shift+f') &&
+               !lower.includes('my scripts') &&
+               !lower.includes('run butonuna') &&
+               !lower.includes('kodu yapıştır');
+      });
+      return filtered.join('\n').trim();
+    }
+
+    function extractDynamicSuggestions(text) {
+      if (!text) return [];
+      const match = text.match(/\[(?:ÖNERİLER|SUGGESTIONS|ONERILER):\s*([^\]]+)\]/i);
+      if (match && match[1]) {
+        return match[1].split('|').map(s => s.trim()).filter(s => s.length > 0);
+      }
+      return [];
+    }
+
+    function renderDynamicSuggestionsHtml(suggestions) {
+      if (!suggestions || suggestions.length === 0) return '';
+      const chips = suggestions.map(s => {
+        const safeEscaped = esc(s).replace(/'/g, "\\'");
+        return `<button class="quick-chip" style="display:inline-flex;align-items:center;gap:4px;" onclick="sendQuick('${safeEscaped}')">💡 ${esc(s)}</button>`;
+      }).join('');
+      return `
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.07);">
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;display:flex;align-items:center;gap:5px;">
+            <span>💡</span><span>Projeye Özel Öneriler:</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${chips}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCheckInBarHtml() {
+      return `
+        <div style="margin-top:10px;padding:9px 12px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+          <div style="font-size:11.5px;color:#cbd5e1;margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+            <span>💬</span><b>Proje nasıl görünüyor, devam edelim mi?</b>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="quick-chip" style="background:rgba(0,184,212,0.18);border-color:rgba(0,184,212,0.5);color:#00e5ff;font-weight:600;display:inline-flex;align-items:center;gap:4px;" onclick="sendContinuation('sıradaki mantıklı detay parçayı')">
+              ▶️ Sıradaki Detayı Ekle
+            </button>
+            <button class="quick-chip" style="display:inline-flex;align-items:center;gap:4px;" onclick="sendQuick('Tasarım harika görünüyor, eline sağlık!')">
+              👍 Harika Görünüyor
+            </button>
+            <button class="quick-chip" style="display:inline-flex;align-items:center;gap:4px;" onclick="document.getElementById('promptInput').value='Ölçüleri veya şekli değiştirmek istiyorum: '; document.getElementById('promptInput').focus();">
+              ✏️ Ölçüleri Değiştir
+            </button>
+            <button class="quick-chip" style="display:inline-flex;align-items:center;gap:4px;" onclick="document.getElementById('promptInput').value='Şu kısımda bir sorun var, düzelt: '; document.getElementById('promptInput').focus();">
+              ❓ Bir Sorun Var, Düzelt
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function extractPythonCode(text) {
+      if (!text) return '';
+      const m = text.match(/```(?:python)?\s*([\s\S]*?)\s*```/i);
+      if (m && m[1]) return m[1].trim();
+      return '';
+    }
+
+    async function callLLM(provider, model, history, apiKey, healingInfo = null, baseUrl = null) {
+      if (provider === 'google') {
+        const contents = [];
+        for (const turn of history) {
+          const role = turn.role === 'assistant' ? 'model' : 'user';
+          const parts = [];
+          if (turn.text) parts.push({ text: turn.text });
+          if (turn.image && turn.role === 'user') {
+            parts.push({
+              inlineData: {
+                mimeType: turn.image.mimeType || 'image/png',
+                data: turn.image.base64
+              }
+            });
+          }
+          if (parts.length > 0) contents.push({ role, parts });
+        }
+
+        if (healingInfo) {
+          contents.push({ role: 'model', parts: [{ text: "```python\n" + healingInfo.previousCode + "\n```" }] });
+          contents.push({ role: 'user', parts: [{ text: healingInfo.healingPrompt }] });
+        }
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const genConfig = thinkingMode
+          ? { temperature: 1, thinkingConfig: { thinkingBudget: 8192 } }
+          : { temperature: 0.3 };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            generationConfig: genConfig
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          // Thinking not supported by model — fallback
+          if (thinkingMode && err?.error?.code === 400) {
+            const res2 = await fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, generationConfig: { temperature: 0.3 } })
+            });
+            if (res2.ok) { const d2 = await res2.json(); return d2.candidates?.[0]?.content?.parts?.[0]?.text || ''; }
+          }
+          throw new Error(err?.error?.message || `Google API Hatası (HTTP ${res.status})`);
+        }
+        const d = await res.json();
+        const txt = d.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!txt) throw new Error("Google API boş yanıt döndürdü.");
+        return txt;
+
+      } else if (provider === 'anthropic') {
+        const messages = [];
+        for (const turn of history) {
+          if (turn.image && turn.role === 'user') {
+            messages.push({
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: turn.image.mimeType || 'image/png',
+                    data: turn.image.base64
+                  }
+                },
+                { type: 'text', text: turn.text || 'Bu görseli referans alarak analiz et veya modelle.' }
+              ]
+            });
+          } else {
+            messages.push({
+              role: turn.role === 'assistant' ? 'assistant' : 'user',
+              content: turn.text
+            });
+          }
+        }
+        if (healingInfo) {
+          messages.push({ role: 'assistant', content: "```python\n" + healingInfo.previousCode + "\n```" });
+          messages.push({ role: 'user', content: healingInfo.healingPrompt });
+        }
+
+        // Anthropic tarayıcı CORS engeli uyguladığı için önce Python backend üzerinden dene
+        try {
+          const pyRes = await sendToFusionAsync('callLLM', {
+            provider: 'anthropic', model,
+            messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+            apiKey
+          });
+          if (pyRes && pyRes.success && pyRes.reply) return pyRes.reply;
+          if (pyRes && pyRes.error) throw new Error(pyRes.error);
+        } catch(pyErr) {
+          console.warn('Python köprüsü çağrılamadı, doğrudan fetch deneniyor:', pyErr);
+        }
+
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            ...(thinkingMode ? { 'anthropic-beta': 'interleaved-thinking-2025-05-14' } : {})
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: thinkingMode ? 16000 : 4096,
+            system: SYSTEM_PROMPT,
+            messages,
+            ...(thinkingMode ? {
+              thinking: { type: 'enabled', budget_tokens: 10000 },
+              temperature: 1
+            } : { temperature: 0.3 })
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || `Anthropic API Hatası (HTTP ${res.status})`);
+        }
+        const d = await res.json();
+        const txt = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+        if (!txt) throw new Error("Anthropic boş yanıt döndürdü.");
+        return txt;
+
+      } else {
+        // OpenAI-uyumlu formatlar (Yerel Model, OpenAI, Groq, OpenRouter, DeepSeek, Ollama)
+        let chatUrl = '';
+        if (provider === 'local' || baseUrl) {
+          const rawBase = (baseUrl || state.localBaseUrl || localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1').trim().replace(/\/+$/, '');
+          chatUrl = rawBase.endsWith('/chat/completions') ? rawBase : `${rawBase}/chat/completions`;
+        }
+        else if (provider === 'openai') chatUrl = 'https://api.openai.com/v1/chat/completions';
+        else if (provider === 'groq') chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        else if (provider === 'openrouter') chatUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        else if (provider === 'deepseek') chatUrl = 'https://api.deepseek.com/chat/completions';
+        else if (provider === 'ollama') chatUrl = 'http://localhost:11434/v1/chat/completions';
+
+        const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+        for (const turn of history) {
+          if (turn.image && turn.role === 'user') {
+            messages.push({
+              role: 'user',
+              content: [
+                { type: 'text', text: turn.text || 'Bu görseli referans alarak analiz et veya modelle.' },
+                { type: 'image_url', image_url: { url: turn.image.dataUrl } }
+              ]
+            });
+          } else {
+            messages.push({
+              role: turn.role === 'assistant' ? 'assistant' : 'user',
+              content: turn.text
+            });
+          }
+        }
+
+        if (healingInfo) {
+          messages.push({ role: 'assistant', content: "```python\n" + healingInfo.previousCode + "\n```" });
+          messages.push({ role: 'user', content: healingInfo.healingPrompt });
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://fusion360.autodesk.com';
+          headers['X-Title'] = 'AI CAD Studio';
+        }
+
+        const timeoutMs = (provider === 'local' || baseUrl) ? 150000 : 90000;
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+
+        try {
+          const res = await fetch(chatUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ model, messages, temperature: 0.3 }),
+            signal: ctrl.signal
+          });
+          clearTimeout(tid);
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `${provider.toUpperCase()} API Hatası (HTTP ${res.status})`);
+          }
+          const d = await res.json();
+          const txt = d.choices?.[0]?.message?.content;
+          if (!txt) throw new Error(`${provider.toUpperCase()} API boş yanıt döndürdü.`);
+          return txt;
+
+        } catch(fetchErr) {
+          clearTimeout(tid);
+          if (provider === 'local' || baseUrl) {
+            console.warn('Doğrudan yerel model çağrısı başarısız, Python köprüsüne devrediliyor:', fetchErr);
+            try {
+              const pyRes = await sendToFusionAsync('callLLM', {
+                provider: 'local',
+                model,
+                messages,
+                apiKey,
+                baseUrl: baseUrl || state.localBaseUrl || 'http://localhost:1234/v1',
+                timeout: 150
+              });
+              if (pyRes && pyRes.success && pyRes.reply) return pyRes.reply;
+              if (pyRes && pyRes.error) throw new Error(pyRes.error);
+            } catch(pyBridgeErr) {
+              console.warn('Python köprüsü çağrısı da başarısız oldu:', pyBridgeErr);
+            }
+            throw new Error(`Yerel model sunucusuna ulaşılamıyor (${chatUrl}). LM Studio veya Ollama uygulamasının açık olduğundan ve sunucunun başlatıldığından emin olun.`);
+          }
+          throw fetchErr;
+        }
+      }
+    }
+
+    // ── Generate & Self-Healing Loop ──
+    async function generateCAD() {
+      if (state.isGenerating) return;
+      const promptInput = document.getElementById('promptInput');
+      const prompt = promptInput.value.trim();
+      const currentImage = attachedImage ? { ...attachedImage } : null;
+
+      if (!prompt && !currentImage) return;
+
+      const isLocalMode = state.sourceMode === 'local';
+      const activeProvider = isLocalMode ? 'local' : state.provider;
+      const activeModel = isLocalMode ? (state.localModel || localStorage.getItem('aicad_local_model') || '') : state.model;
+      const activeApiKey = isLocalMode ? (state.localApiKey || localStorage.getItem('aicad_local_api_key') || '') : (localStorage.getItem('aicad_key_' + state.provider) || '');
+      const activeBaseUrl = isLocalMode ? (state.localBaseUrl || localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1') : null;
+      const provName = isLocalMode ? 'Yerel Model (Local)' : (PROVIDERS.find(p => p.id === state.provider)?.name || state.provider);
+
+      if (isLocalMode) {
+        if (!activeModel) {
+          addMsg('ai', '<div class="status-badge error">❌ Yerel model seçilmedi. Ayarlar (⚙️) menüsünden model adı girin veya "Modelleri Listele" butonuyla seçin.</div>');
+          return;
+        }
+      } else {
+        if (!state.connected[state.provider]) {
+          addMsg('ai', '<div class="status-badge error">❌ Sağlayıcı bağlı değil. Ayarlardan API anahtarınızı girin ve bağlanın.</div>');
+          return;
+        }
+        if (!state.model) {
+          addMsg('ai', '<div class="status-badge error">❌ Model seçili değil. Ayarlardan bir model seçin.</div>');
+          return;
+        }
+      }
+
+      // Render user message with attached image preview
+      let userMsgHtml = '';
+      if (currentImage) {
+        userMsgHtml += `<img src="${currentImage.dataUrl}" class="msg-attached-img" alt="Referans Görsel">`;
+      }
+      if (prompt) {
+        userMsgHtml += `<div>${esc(prompt)}</div>`;
+      } else {
+        userMsgHtml += `<div style="color:var(--text-2);font-style:italic;">Görsel referans olarak gönderildi.</div>`;
+      }
+      addMsg('user', userMsgHtml);
+
+      // Active Fusion 360 design state inspection
+      let designState = null;
+      try {
+        designState = await getCurrentDesignState();
+        updateWorkspaceStatusBadge(designState);
+      } catch(e) {
+        console.warn('Tasarım durumu okunamadı:', e);
+      }
+
+      const isContinuation = /devam|sonraki|sıradak|ilerle|kaldığın|tamam|ekle|yap|bitir|ayrıntı|çiz|oluştur/i.test(prompt);
+      const isComplaint = /tasarım yapmıyor|çizmiyor|model nerede|görünmüyor|eklenmedi|yapmıyor|çizmedi/i.test(prompt);
+      let effectivePrompt = prompt || 'Bu görseli referans alarak incele ve tasarım için yol göster veya modelle.';
+
+      if (designState && designState.has_design && designState.bodies_count > 0) {
+        effectivePrompt = `${effectivePrompt}\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n${designState.summary_text}\n(Lütfen yeni eklenecek parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır, NewBodyFeatureOperation kullan ve gövdeleri kesmeye/birleştirmeye çalışma)`;
+      }
+
+      if ((isContinuation || isComplaint) && designState && designState.has_design && designState.bodies_count > 0) {
+        effectivePrompt += `\n\n[KESİNTİSİZ ADIM ADIM MODELLEME TALİMATI]:
+Kullanıcı tasarıma devam etmeni ve Fusion 360 ekranında somut 3D parçayı hemen oluşturmanı istiyor!
+KESİNLİKLE soru sorma, 'şunu mu yapalım bunu mu' gibi seçenek sunup bekleme!
+Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat altı jet motorları, gövde üstü kokpit kanopisi, dikey kuyruk kanatçığı) kendin belirleyerek DOĞRUDAN Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret!
+ÖNEMLİ ZORUNLULUK: Kodun sonunda çizdiğin kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile mutlaka 3D katı gövdeye dönüştür! Sadece 2D eskiz çizip bırakma, böylece kullanıcı ekranda parçayı hemen 3D olarak görsün!`;
+      }
+
+      // Add to conversation history
+      conversationHistory.push({
+        role: 'user',
+        text: effectivePrompt,
+        image: currentImage
+      });
+
+      // Clear input fields
+      promptInput.value = '';
+      promptInput.style.height = 'auto';
+      removeAttachedImage();
+
+      state.isGenerating = true;
+      document.getElementById('btnSend').disabled = true;
+
+      try {
+        addTyping();
+
+        let rawReply = '';
+        try {
+          rawReply = await callLLM(activeProvider, activeModel, conversationHistory, activeApiKey, null, activeBaseUrl);
+        } catch(llmErr) {
+          throw llmErr;
+        }
+
+        removeTyping();
+
+        const code = extractPythonCode(rawReply);
+
+        // ── 1. MOD: DANIŞMANLIK & SOHBET (Kod Yok) ──
+        if (!code) {
+          const suggestions = extractDynamicSuggestions(rawReply);
+          const cleanedText = cleanExplanationText(rawReply);
+          let formattedText = formatMarkdown(cleanedText);
+          if (suggestions && suggestions.length > 0) {
+            formattedText += renderDynamicSuggestionsHtml(suggestions);
+          }
+          addMsg('ai', formattedText);
+          conversationHistory.push({ role: 'assistant', text: rawReply });
+          saveCurrentConversation(); // Konuşmayı localStorage'a kaydet
+          return;
+        }
+
+        // ── 2. MOD: CAD MODELLEME (Python Kodu Var) ──
+        let currentCode = code;
+        let currentReply = rawReply;
+        const initialSuggestions = extractDynamicSuggestions(rawReply);
+        const rawText = rawReply.replace(/```(?:python)?[\s\S]*?```/gi, '').trim();
+        const textExplanation = cleanExplanationText(rawText);
+
+        let aiMsgHtml = '';
+        if (designState && designState.has_design && designState.bodies_count > 0) {
+          aiMsgHtml += `<div style="font-size:11.5px;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(56,189,248,0.08);padding:4px 9px;border-radius:6px;border:1px solid rgba(56,189,248,0.2);"><span>📐</span><span>Mevcut model okundu (<b>${designState.bodies_count} gövde</b> referans alındı)</span></div>`;
+        }
+        if (textExplanation) {
+          aiMsgHtml += `<div style="margin-bottom:8px;">${formatMarkdown(textExplanation)}</div>`;
+        }
+
+        aiMsgHtml += `
+          <div class="status-badge loading" id="activeCadStatus">⚙️ Fusion 360 içinde model oluşturuluyor...</div>
+          <div style="margin-top:6px;">
+            <span style="font-size:10.5px;color:#555;cursor:pointer;user-select:none;" onclick="const el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.textContent=el.style.display==='none'?'[+ Teknik Kod]':'[- Teknik Kodu Gizle]';">[+ Teknik Kod]</span>
+            <pre style="display:none;margin-top:4px;padding:8px 10px;font-size:11px;background:#090d13;border:1px solid #1a2230;border-radius:6px;color:#8b949e;overflow-x:auto;max-height:180px;"><code id="cadCodeBlock">${esc(currentCode)}</code></pre>
+          </div>
+          <div id="dynamicSuggestionsContainer">
+            ${renderDynamicSuggestionsHtml(initialSuggestions)}
+          </div>
+          <div id="checkInBarContainer" style="display:none;">
+            ${renderCheckInBarHtml()}
+          </div>
+        `;
+
+        const aiMsgElem = addMsg('ai', aiMsgHtml);
+        conversationHistory.push({ role: 'assistant', text: rawReply });
+        saveCurrentConversation(); // Konuşmayı localStorage'a kaydet
+
+        // Fusion 360 içinde kodu yürüt
+        let execRes = await sendToFusionAsync('executeCADCode', { code: currentCode });
+        const statusEl = aiMsgElem.querySelector('#activeCadStatus');
+        const checkInEl = aiMsgElem.querySelector('#checkInBarContainer');
+        const codeBlockEl = aiMsgElem.querySelector('#cadCodeBlock');
+
+        // ── 3. MOD: MULTI-ATTEMPT SELF-HEALING (Hata Onarımı - 3 Denemeye Kadar) ──
+        let attempts = 0;
+        const MAX_HEALING_ATTEMPTS = 3;
+
+        while (!execRes?.success && !execRes?.devMode && attempts < MAX_HEALING_ATTEMPTS) {
+          attempts++;
+          const errMsg = execRes?.error || 'Bilinmeyen Fusion 360 API hatası';
+          const errTb = execRes?.traceback || '';
+
+          if (statusEl) {
+            statusEl.className = 'status-badge healing';
+            const fusionErrTr = formatFusionErrorInTurkish(errMsg);
+            statusEl.innerHTML = `🔧 <b>Sorun tespit edildi (${attempts}/${MAX_HEALING_ATTEMPTS}):</b> ${esc(fusionErrTr)}<br/><span style="font-size:11.5px;opacity:0.9">Yapay zeka sorunu gidermek için kodu onarıyor...</span>`;
+          }
+
+          addTyping();
+
+          let specificTip = '';
+          if (errMsg.includes('HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ') || errMsg.includes('No bodies added')) {
+            specificTip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile 3D katı gövdeye dönüştür.\n";
+          } else if (errMsg.includes('Kesilecek veya kesişecek hedef gövde bulunamadı')) {
+            specificTip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n";
+          } else if (errMsg.includes('profiles.item')) {
+            specificTip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n";
+          }
+
+          const healingPrompt = `Fusion 360 API şu hatayı verdi (${attempts}. deneme):\n${errMsg}\n\nDetaylı Traceback:\n${errTb}\n\n${specificTip}Lütfen hatanın nedenini gidererek eksiksiz, çalışan Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğunda tekrar üret. Sadece saf Python kodu döndür.`;
+
+          let rawHealingReply = '';
+          try {
+            rawHealingReply = await callLLM(activeProvider, activeModel, conversationHistory, activeApiKey, {
+              previousCode: currentCode,
+              healingPrompt: healingPrompt
+            }, activeBaseUrl);
+          } catch(hErr) {
+            console.warn('Healing LLM error:', hErr);
+            break;
+          } finally {
+            removeTyping();
+          }
+
+          const healedCode = extractPythonCode(rawHealingReply);
+          if (!healedCode) {
+            console.warn('Healing did not yield code');
+            break;
+          }
+
+          currentCode = healedCode;
+          currentReply = rawHealingReply;
+          if (codeBlockEl) codeBlockEl.textContent = currentCode;
+
+          if (statusEl) {
+            statusEl.className = 'status-badge loading';
+            statusEl.innerHTML = `⚙️ Onarılan kod Fusion 360 içinde test ediliyor (${attempts}/${MAX_HEALING_ATTEMPTS})...`;
+          }
+
+          execRes = await sendToFusionAsync('executeCADCode', { code: currentCode });
+          if (execRes?.success) {
+            break;
+          }
+        }
+
+        if (execRes && execRes.success) {
+          if (statusEl) {
+            statusEl.className = 'status-badge success';
+            const addedBodies = (execRes.new_bodies && execRes.new_bodies.length > 0)
+              ? ` (${execRes.new_bodies.join(', ')} eklendi)`
+              : '';
+            statusEl.innerHTML = `✅ Model Fusion 360 çalışma alanına başarıyla eklendi!${esc(addedBodies)}`;
+          }
+          if (checkInEl) {
+            checkInEl.style.display = 'block';
+          }
+          const updatedSuggestions = extractDynamicSuggestions(currentReply);
+          if (updatedSuggestions && updatedSuggestions.length > 0) {
+            const dynEl = aiMsgElem.querySelector('#dynamicSuggestionsContainer');
+            if (dynEl) dynEl.innerHTML = renderDynamicSuggestionsHtml(updatedSuggestions);
+          }
+          getCurrentDesignState().then(st => updateWorkspaceStatusBadge(st)).catch(() => {});
+          return;
+        }
+
+        if (execRes && execRes.devMode) {
+          if (statusEl) {
+            statusEl.className = 'status-badge error';
+            const devErrInfo = formatErrorInTurkish(execRes.error, 'Harici Tarayıcı');
+            statusEl.innerHTML = `⚠️ <b>${esc(devErrInfo.title)}:</b> ${esc(devErrInfo.description)}`;
+          }
+          return;
+        }
+
+        // Onarım döngüsü bitti ve hala hata varsa
+        const finalErrMsg = execRes?.error || 'Bilinmeyen hata';
+        if (statusEl) {
+          statusEl.className = 'status-badge error';
+          const fusionErrTr = formatFusionErrorInTurkish(finalErrMsg);
+          statusEl.innerHTML = `❌ <b>Onarım denemeleri (${attempts}/${MAX_HEALING_ATTEMPTS}) tamamlanamadı:</b> ${esc(fusionErrTr)}`;
+        }
+
+      } catch(err) {
+        removeTyping();
+        const errInfo = formatErrorInTurkish(err.message || '', provName);
+        addMsg('ai', `
+          <div class="status-badge error">❌ ${esc(errInfo.title)}</div>
+          <div style="margin-top:7px;color:#e2e8f0;font-size:13px;line-height:1.5;">${esc(errInfo.description)}</div>
+          ${errInfo.tip ? `<div style="margin-top:8px;font-size:12px;color:#38bdf8;background:rgba(56,189,248,0.08);padding:7px 11px;border-radius:8px;border:1px solid rgba(56,189,248,0.22);line-height:1.45;">💡 <b>Ne yapabilirsiniz:</b> ${esc(errInfo.tip)}</div>` : ''}
+          ${errInfo.raw ? `
+            <div style="margin-top:8px;">
+              <span style="font-size:11px;color:#64748b;cursor:pointer;user-select:none;text-decoration:underline;" onclick="const el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.textContent=el.style.display==='none'?'[+ Orijinal Teknik Hata]':'[- Orijinal Teknik Hatayı Gizle]';">[+ Orijinal Teknik Hata]</span>
+              <pre style="display:none;margin-top:4px;padding:6px 10px;font-size:10.5px;background:#0d1117;border:1px solid #21262d;border-radius:6px;color:#8b949e;overflow-x:auto;max-height:120px;"><code>${esc(errInfo.raw)}</code></pre>
+            </div>
+          ` : ''}
+        `);
+      } finally {
+        removeTyping();
+        state.isGenerating = false;
+        document.getElementById('btnSend').disabled = false;
+      }
+    }
+
+    // Legacy / Fallback Handlers
+    function onStatusUpdate(d) {
+      removeTyping();
+      const icons = { loading:'⏳', healing:'🔧', success:'✅', error:'❌' };
+      const s = d.status || 'loading';
+      addMsg('ai', `<div class="status-badge ${s}">${icons[s]||'⏳'} ${esc(d.message||'')}</div>`);
+      if (s === 'loading' || s === 'healing') addTyping();
+    }
+
+    function onTaskResult(d) {
+      state.isGenerating = false;
+      document.getElementById('btnSend').disabled = false;
+      removeTyping();
+      if (d.status === 'success') {
+        addMsg('ai', `<div class="status-badge success">✅ ${esc(d.message||'Model başarıyla oluşturuldu!')}</div><p style="margin-top:8px;color:#aaa;font-size:12.5px">Fusion 360 çalışma alanını kontrol edebilirsin.</p>`);
+      } else if (d.status === 'chat') {
+        addMsg('ai', formatMarkdown(d.message || ''));
+        conversationHistory.push({ role: 'assistant', text: d.message || '' });
+      } else {
+        const errInfo = formatErrorInTurkish(d.message || '', 'Fusion 360');
+        addMsg('ai', `
+          <div class="status-badge error">❌ ${esc(errInfo.title)}</div>
+          <div style="margin-top:6px;color:#e2e8f0;font-size:13px;line-height:1.5;">${esc(errInfo.description)}</div>
+          ${errInfo.tip ? `<div style="margin-top:8px;font-size:12px;color:#38bdf8;background:rgba(56,189,248,0.08);padding:7px 11px;border-radius:8px;border:1px solid rgba(56,189,248,0.22);">${esc(errInfo.tip)}</div>` : ''}
+        `);
+      }
+    }
+  </script>
+</body>
+</html>
