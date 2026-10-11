@@ -5,6 +5,7 @@ import re
 import urllib.error
 import urllib.request
 
+from aicad_bridge import config as app_config
 from aicad_bridge.llm.registry import PROVIDERS
 
 
@@ -122,7 +123,9 @@ def _call_anthropic(model, messages, api_key, timeout):
 
     payload = {
         'model': model,
-        'max_tokens': 4096,
+        # Yapılandırılabilir yanıt uzunluğu (.env: AICAD_MAX_TOKENS, varsayılan 16384).
+        # Eski sabit değer 4096 idi; uzun CAD kodları kesilmesin diye yükseltildi.
+        'max_tokens': app_config.get_settings()['max_tokens'],
         'messages': chat_messages,
         'temperature': 0.2,
     }

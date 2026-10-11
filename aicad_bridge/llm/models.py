@@ -4,6 +4,7 @@ import json
 import urllib.error
 import urllib.request
 
+from aicad_bridge import config as app_config
 from aicad_bridge.llm.registry import PROVIDERS
 
 
@@ -135,13 +136,10 @@ def _fetch_anthropic_models(api_key):
         models.sort(key=lambda x: x['name'])
         return {'success': True, 'models': models}
     except Exception:
-        # Fallback: bilinen modeller
-        fallback = [
-            {'id': 'claude-sonnet-4-20250514', 'name': 'Claude Sonnet 4'},
-            {'id': 'claude-opus-4-20250514', 'name': 'Claude Opus 4'},
-            {'id': 'claude-3-5-sonnet-20241022', 'name': 'Claude 3.5 Sonnet'},
-            {'id': 'claude-3-5-haiku-20241022', 'name': 'Claude 3.5 Haiku'},
-        ]
+        # Fallback: .env üzerinden tanımlı yedek liste (AICAD_ANTHROPIC_MODELS).
+        # Model adları koda gömülmez; liste boşsa kullanıcı model adını elle girer.
+        fallback = [{'id': mid, 'name': mid}
+                    for mid in app_config.get_settings()['anthropic_models']]
         return {'success': True, 'models': fallback}
 
 
