@@ -8,7 +8,8 @@ import threading
 import adsk.core
 import adsk.fusion
 
-from aicad_bridge import events, runtime
+from aicad_bridge import config as app_config, events, runtime
+from aicad_bridge.llm import pipeline as llm_pipeline
 from aicad_bridge.llm.client import call_llm_api
 from aicad_bridge.llm.models import fetch_models
 from aicad_bridge.runtime import LOCAL_HTTP_PORT, aicad_log
@@ -40,6 +41,10 @@ class LocalBridgeHTTPHandler(http.server.BaseHTTPRequestHandler):
                 'activeDesign': bool(adsk.fusion.Design.cast(runtime.app.activeProduct)) if runtime.app else False
             }
             self.wfile.write(json.dumps(res).encode('utf-8'))
+        elif path == '/config':
+            # .env / config.py tabanlı yapılandırma (harici tarayıcı modu)
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps(app_config.get_public_settings()).encode('utf-8'))
         elif path in ('/design_state', '/inspect'):
             self._set_cors_headers(200)
             res = events.get_design_state_on_main_thread()
@@ -95,6 +100,17 @@ class LocalBridgeHTTPHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self._set_cors_headers(200)
                 self.wfile.write(json.dumps({'success': False, 'error': str(e)}).encode('utf-8'))
+
+        elif path == '/pipeline_helper':
+            # İki aşamalı hat (Planner/Coder) yardımcıları — harici tarayıcı modu.
+            # Bu handler arka plan thread'inde çalıştığı için tasarım inceleme ve
+            # viewport yakalama ana thread'e olay köprüsü üzerinden taşınır.
+            res = llm_pipeline.run_pipeline_helper(
+                body,
+                inspect_state=events.get_design_state_on_main_thread,
+                capture_viewport=events.capture_viewport_on_main_thread)
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps(res).encode('utf-8'))
 
         elif path == '/fetch_models':
             provider = body.get('provider', '')

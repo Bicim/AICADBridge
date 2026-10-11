@@ -832,6 +832,10 @@
             <span style="font-size:14px;">🧠</span>
             <span id="thinkingLabel">Düşünce</span>
           </button>
+          <button id="btnVisionVerify" onclick="toggleVisionVerify()" title="Görsel Doğrulama (vision destekli sağlayıcılarda model bittikten sonra viewport kontrolü)" style="background:transparent;border:1px solid transparent;color:#888;cursor:pointer;padding:5px 10px;border-radius:8px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;transition:all .15s;font-family:var(--font);" onmouseover="this.style.color='#fff'" onmouseout="if(!visionVerifyEnabled)this.style.color='#888'">
+            <span style="font-size:14px;">👁️</span>
+            <span id="visionVerifyLabel">Görsel Doğrulama</span>
+          </button>
           <button id="btnConnectPill" class="btn-connect-pill disconnected" onclick="openConnectModal()" title="Fusion 360 Bağlantı Durumu">
             <span class="status-dot"></span>
             <span class="status-text" id="connectPillText">Fusion'a Bağlan</span>
@@ -1001,6 +1005,16 @@
           <select id="modelSelect" class="s-control"></select>
         </div>
 
+        <!-- Manual model entry (list cannot be fetched, e.g. Anthropic CORS) -->
+        <div class="s-group" id="manualModelSection" style="display:none">
+          <div class="s-label">Model Adı (Elle Gir)</div>
+          <div class="s-row">
+            <input type="text" id="manualModelInput" class="s-control" placeholder="Sağlayıcının güncel model adını girin" />
+            <button type="button" class="btn-connect" onclick="applyManualModel()">Kullan</button>
+          </div>
+          <div class="s-hint">Model listesi alınamadı (CORS/bağlantı). Güncel model adını sağlayıcının konsolundan kopyalayıp girin; .env içinde AICAD_ANTHROPIC_MODELS ile yedek liste de tanımlayabilirsiniz.</div>
+        </div>
+
         <!-- Placeholder when not connected -->
         <div class="model-status" id="modelStatusMsg" style="display:none"></div>
       </div>
@@ -1085,6 +1099,31 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Production Pipeline (Planner & Coder) Model Settings -->
+      <div id="pipelineSettingsSection" style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">
+        <div class="s-label">🏭 Üretim Hattı (Planner & Coder)</div>
+        <div class="s-hint" style="margin-bottom:10px;">İki aşamalı hatta farklı modeller kullanabilirsiniz. Ayarlanmazsa sohbet modeli kullanılır. Kalıcı varsayılanlar .env ile de tanımlanabilir (AICAD_PLANNER_*, AICAD_CODER_*).</div>
+
+        <div class="s-group">
+          <div class="s-label">📋 Planner Modeli (plan JSON'u üretir — hızlı model yeterli)</div>
+          <select id="plannerProviderSelect" class="s-control" style="margin-bottom:6px;"></select>
+          <input type="text" id="plannerModelInput" class="s-control" placeholder="Model adı — boş bırakılırsa sohbet modeli kullanılır" />
+          <div class="s-hint" id="plannerEnvHint"></div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-label">🧑‍💻 Coder Modeli (Fusion 360 kodunu üretir — güçlü model önerilir)</div>
+          <select id="coderProviderSelect" class="s-control" style="margin-bottom:6px;"></select>
+          <input type="text" id="coderModelInput" class="s-control" placeholder="Model adı — boş bırakılırsa sohbet modeli kullanılır" />
+          <div class="s-hint" id="coderEnvHint"></div>
+        </div>
+
+        <div class="s-hint" id="pipelineMaxTokensHint"></div>
+        <button type="button" class="btn-save-local" onclick="savePipelineSettingsUI()" style="width:100%;margin-top:4px;">
+          <span>💾</span><span>Üretim Hattı Ayarlarını Kaydet</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1234,6 +1273,7 @@
       provider: localStorage.getItem('aicad_provider') || 'ollama',
       model: localStorage.getItem('aicad_model') || '',
       modelName: localStorage.getItem('aicad_modelName') || '',
+      pipelineConfig: null,
       localBaseUrl: localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1',
       localModel: localStorage.getItem('aicad_local_model') || '',
       localApiKey: localStorage.getItem('aicad_local_api_key') || '',
@@ -1357,12 +1397,35 @@
           const res = await fetch('http://127.0.0.1:49876/call_llm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data || {}),
+            body: p,
             signal: AbortSignal.timeout(160000)
           });
           if (res.ok) return await res.json();
         } catch(err) {
           console.warn('[Web Köprüsü] callLLM başarısız:', err);
+        }
+      }
+
+      if (action === 'getConfig') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/config', { signal: AbortSignal.timeout(4000) });
+          if (res.ok) return await res.json();
+        } catch(err) {
+          console.warn('[Web Köprüsü] config alınamadı:', err);
+        }
+      }
+
+      if (action === 'pipelineHelper') {
+        try {
+          const res = await fetch('http://127.0.0.1:49876/pipeline_helper', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: p,
+            signal: AbortSignal.timeout(30000)
+          });
+          if (res.ok) return await res.json();
+        } catch(err) {
+          console.warn('[Web Köprüsü] pipelineHelper başarısız:', err);
         }
       }
 
@@ -1546,6 +1609,7 @@
       renderProviderList();
       updateModelLabel();
       scanOllama();
+      loadPipelineConfig();
 
       // ── Yeni Özellik Başlatmaları ──
       loadConversations();           // Konuşma geçmişini yükle
@@ -1624,7 +1688,10 @@
       const apiSec = document.getElementById('apiKeySection');
       const modelSec = document.getElementById('modelSection');
       const statusMsg = document.getElementById('modelStatusMsg');
+      const manualSec = document.getElementById('manualModelSection');
       const hint = document.getElementById('apiHint');
+
+      if (manualSec) manualSec.style.display = 'none';
 
       if (!prov.needsKey) {
         apiSec.style.display = 'none';
@@ -1717,14 +1784,11 @@
             .sort((a,b) => a.name.localeCompare(b.name));
 
         } else if (provider === 'anthropic') {
-          // Anthropic doesn't support browser CORS — use known models
-          models = [
-            { id:'claude-sonnet-4-20250514',    name:'Claude Sonnet 4' },
-            { id:'claude-opus-4-20250514',      name:'Claude Opus 4' },
-            { id:'claude-3-7-sonnet-20250219',  name:'Claude 3.7 Sonnet' },
-            { id:'claude-3-5-sonnet-20241022',  name:'Claude 3.5 Sonnet' },
-            { id:'claude-3-5-haiku-20241022',   name:'Claude 3.5 Haiku' },
-          ];
+          // Anthropic doesn't support browser CORS — use .env/config fallback list
+          // (AICAD_ANTHROPIC_MODELS). Model adları koda gömülmez; liste boşsa
+          // kullanıcı model adını arayüzden elle girer.
+          models = (state.pipelineConfig?.anthropic_models || [])
+            .map(id => ({ id: id, name: id }));
           // Validate key with a lightweight request (may fail due to CORS, that's OK)
           try {
             const r = await fetch('https://api.anthropic.com/v1/models', {
@@ -2056,6 +2120,8 @@
         populateModelSelect(result.models);
         document.getElementById('modelSection').style.display = 'block';
         document.getElementById('modelStatusMsg').style.display = 'none';
+        const manualSecOk = document.getElementById('manualModelSection');
+        if (manualSecOk) manualSecOk.style.display = 'none';
         updateModelLabel();
       } else {
         state.connected[provider] = false;
@@ -2063,6 +2129,25 @@
         hint.textContent = `${errInfo.title} — ${errInfo.description}`;
         hint.className = 's-hint err';
         document.getElementById('modelSection').style.display = 'none';
+        // Model listesi alınamadıysa (ör. Anthropic CORS engeli) elle model adı
+        // girme imkânı sun; ayrıca .env'deki yedek liste de denenebilir.
+        if (state.pipelineConfig?.anthropic_models?.length > 0 && provider === 'anthropic') {
+          const models = state.pipelineConfig.anthropic_models.map(id => ({ id, name: id }));
+          state.fetchedModels[provider] = models;
+          state.connected[provider] = true;
+          hint.textContent = `✓ .env yedek listesinden ${models.length} model yüklendi`;
+          hint.className = 's-hint ok';
+          populateModelSelect(models);
+          document.getElementById('modelSection').style.display = 'block';
+        } else {
+          const manualSec = document.getElementById('manualModelSection');
+          if (manualSec) {
+            manualSec.style.display = 'block';
+            const savedModel = localStorage.getItem('aicad_model') || '';
+            const input = document.getElementById('manualModelInput');
+            if (input && savedModel) input.value = savedModel;
+          }
+        }
       }
     }
 
@@ -2449,6 +2534,7 @@
     function openSettings() {
       const currentMode = state.sourceMode || localStorage.getItem('aicad_source_mode') || 'cloud';
       setSourceMode(currentMode);
+      populatePipelineSettingsUI();
       document.getElementById('settingsOverlay').classList.add('visible');
     }
     function closeSettings() {
@@ -2863,6 +2949,184 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // GÖRSEL DOĞRULAMA (Vision Verify) Toggle — iki aşamalı hattın vision adımı
+    // ═══════════════════════════════════════════════════════════════
+    let visionVerifyEnabled = localStorage.getItem('aicad_vision_verify') !== 'false';
+
+    function applyVisionVerifyUI() {
+      const btn = document.getElementById('btnVisionVerify');
+      const lbl = document.getElementById('visionVerifyLabel');
+      if (visionVerifyEnabled) {
+        if (btn) { btn.style.color = '#00e5ff'; btn.style.borderColor = 'rgba(0,184,212,.5)'; btn.style.background = 'rgba(0,184,212,.1)'; }
+        if (lbl) lbl.textContent = 'Görsel Doğrulama ✓';
+      } else {
+        if (btn) { btn.style.color = '#888'; btn.style.borderColor = 'transparent'; btn.style.background = 'transparent'; }
+        if (lbl) lbl.textContent = 'Görsel Doğrulama';
+      }
+    }
+
+    function toggleVisionVerify() {
+      visionVerifyEnabled = !visionVerifyEnabled;
+      localStorage.setItem('aicad_vision_verify', visionVerifyEnabled);
+      applyVisionVerifyUI();
+    }
+
+    applyVisionVerifyUI();
+
+    // ═══════════════════════════════════════════════════════════════
+    // MODEL YAPILANDIRMASI: .env / config.py + UI seçimi
+    // Öncelik: UI (localStorage) > .env/config.py (state.pipelineConfig) > sohbet modeli
+    // ═══════════════════════════════════════════════════════════════
+    async function loadPipelineConfig() {
+      try {
+        const cfg = await sendToFusionAsync('getConfig', {});
+        if (cfg && typeof cfg === 'object' && (cfg.planner || cfg.coder || cfg.max_tokens)) {
+          state.pipelineConfig = cfg;
+          console.log('[Config] Üretim hattı yapılandırması yüklendi:', cfg);
+        }
+      } catch(e) {
+        console.warn('loadPipelineConfig başarısız (ayarlar yüklenmedi, varsayılanlar kullanılacak):', e);
+      }
+    }
+
+    function getLLMMaxTokens() {
+      return Number(state.pipelineConfig?.max_tokens) || 16384;
+    }
+
+    function getVisionMaxTokens() {
+      return Number(state.pipelineConfig?.vision_max_tokens) || 4096;
+    }
+
+    // Elle model adı girişi (model listesi alınamadığında, ör. Anthropic CORS engeli)
+    function applyManualModel() {
+      const input = document.getElementById('manualModelInput');
+      const value = (input?.value || '').trim();
+      if (!value) return;
+      state.model = value;
+      state.modelName = value;
+      state.connected[state.provider] = true;
+      localStorage.setItem('aicad_model', value);
+      localStorage.setItem('aicad_modelName', value);
+      updateModelLabel();
+      const hint = document.getElementById('apiHint');
+      if (hint) { hint.textContent = `✓ Model elle ayarlandı: ${value}`; hint.className = 's-hint ok'; }
+    }
+
+    // ── Üretim hattı (Planner & Coder) ayar arayüzü ──
+    function populatePipelineSettingsUI() {
+      const cfg = state.pipelineConfig || {};
+      const sameLabel = '💬 Sohbet modeliyle aynı (varsayılan)';
+
+      const fill = (selectId, inputId, hintId, stage, label) => {
+        const sel = document.getElementById(selectId);
+        const inp = document.getElementById(inputId);
+        const hintEl = document.getElementById(hintId);
+        if (!sel || !inp) return;
+        sel.innerHTML = '';
+        const sameOpt = document.createElement('option');
+        sameOpt.value = '';
+        sameOpt.textContent = sameLabel;
+        sel.appendChild(sameOpt);
+        PROVIDERS.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = `${p.icon || '•'} ${p.name}`;
+          sel.appendChild(opt);
+        });
+        const localOpt = document.createElement('option');
+        localOpt.value = 'local';
+        localOpt.textContent = '🖥️ Yerel Model (Local)';
+        sel.appendChild(localOpt);
+
+        const savedProvider = localStorage.getItem('aicad_' + stage + '_provider') || '';
+        const savedModel = localStorage.getItem('aicad_' + stage + '_model') || '';
+        sel.value = savedProvider;
+        inp.value = savedModel;
+
+        const envCfg = cfg[stage];
+        if (hintEl) {
+          if (envCfg && envCfg.model) {
+            const provName = envCfg.provider ? (PROVIDERS.find(p => p.id === envCfg.provider)?.name || envCfg.provider) : 'sohbet modeli';
+            hintEl.textContent = `.env varsayılanı: ${envCfg.model} (${provName}) — UI seçimi boşsa kullanılır`;
+          } else {
+            hintEl.textContent = '.env varsayılanı yok — boş bırakılırsa sohbet modeli kullanılır';
+          }
+        }
+      };
+
+      fill('plannerProviderSelect', 'plannerModelInput', 'plannerEnvHint', 'planner', 'Planner');
+      fill('coderProviderSelect', 'coderModelInput', 'coderEnvHint', 'coder', 'Coder');
+
+      const mtHint = document.getElementById('pipelineMaxTokensHint');
+      if (mtHint) {
+        mtHint.textContent = `Yanıt uzunluğu sınırı (max_tokens): ${getLLMMaxTokens()} — .env üzerinden AICAD_MAX_TOKENS ile değiştirilir`;
+      }
+    }
+
+    function savePipelineSettingsUI() {
+      const read = (selectId, inputId, stage) => {
+        const provider = document.getElementById(selectId)?.value || '';
+        const model = (document.getElementById(inputId)?.value || '').trim();
+        if (provider) {
+          localStorage.setItem('aicad_' + stage + '_provider', provider);
+        } else {
+          localStorage.removeItem('aicad_' + stage + '_provider');
+        }
+        if (provider && model) {
+          localStorage.setItem('aicad_' + stage + '_model', model);
+        } else {
+          localStorage.removeItem('aicad_' + stage + '_model');
+        }
+      };
+      read('plannerProviderSelect', 'plannerModelInput', 'planner');
+      read('coderProviderSelect', 'coderModelInput', 'coder');
+      const btn = document.querySelector('#pipelineSettingsSection .btn-save-local');
+      if (btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = '<span>✅</span><span>Kaydedildi</span>';
+        setTimeout(() => { btn.innerHTML = original; }, 1600);
+      }
+    }
+
+    // Planner/Coder aşamaları için bağlantı bilgisini çözer:
+    // 1) UI seçimi (localStorage) 2) .env/config.py varsayılanı 3) sohbet modeli
+    function getPipelineModelSettings(mainConn) {
+      const buildConn = (provider, model) => {
+        if (!provider || !model) return null;
+        if (provider === 'local') {
+          return {
+            provider: 'local',
+            model: model,
+            apiKey: state.localApiKey || localStorage.getItem('aicad_local_api_key') || '',
+            baseUrl: state.localBaseUrl || localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1'
+          };
+        }
+        return {
+          provider: provider,
+          model: model,
+          apiKey: localStorage.getItem('aicad_key_' + provider) || '',
+          baseUrl: null
+        };
+      };
+      const resolve = (stage) => {
+        let provider = localStorage.getItem('aicad_' + stage + '_provider') || '';
+        let model = localStorage.getItem('aicad_' + stage + '_model') || '';
+        if (!model) {
+          const cfg = state.pipelineConfig?.[stage];
+          if (cfg && cfg.model) {
+            provider = cfg.provider || '';
+            model = cfg.model;
+          }
+        }
+        return buildConn(provider, model);
+      };
+      return {
+        planner: resolve('planner') || mainConn,
+        coder: resolve('coder') || mainConn
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // CADAM-İLHAMLI ÖZELLİK 3: View Switcher (Chat / Parametric)
     // ═══════════════════════════════════════════════════════════════
     function switchView(view) {
@@ -3140,10 +3404,20 @@ CRITICAL ARCHITECTURAL RULES:
      * Görseli detaylı analiz et: geometri, oranlar, görünür ölçüler ve notlar, bakış açısı.
      * Anladığını kısaca özetle ("Görselde şunları görüyorum: ..."); kritik belirsizlik varsa 2. maddedeki "nasıl yapalım?" prensibiyle netleştir.
      * Ardından görseldeki tasarıma SADIK kalarak (orantılar ve okunan ölçüler) modelle.
-   - Kullanıcı bir METİN/DOSYA eki ([EK DOSYA: isim] blokları — DXF, SVG, CSV, JSON, TXT vb.) gönderdiyse:
-     * İçeriği dikkatle oku: geometri komutları, koordinatlar, parametreler, ölçü tabloları.
-     * Dosyadan elde ettiklerini TASARIM PLANI'na işle; dosyada olmayan kritik bilgileri sor.
-     * Modeli bu veriler üzerine kur (örn. DXF koordinatlarını eskiz profiline, CSV ölçülerini parametrelere aktar).`;
+    - Kullanıcı bir METİN/DOSYA eki ([EK DOSYA: isim] blokları — DXF, SVG, CSV, JSON, TXT vb.) gönderdiyse:
+      * İçeriği dikkatle oku: geometri komutları, koordinatlar, parametreler, ölçü tabloları.
+      * Dosyadan elde ettiklerini TASARIM PLANI'na işle; dosyada olmayan kritik bilgileri sor.
+      * Modeli bu veriler üzerine kur (örn. DXF koordinatlarını eskiz profiline, CSV ölçülerini parametrelere aktar).
+
+8. PARAMETRİK VE GERÇEK ÖZELLİK KULLANIMI (PARAMETRIC & NATIVE FEATURES):
+   - Önemli ölçüleri kod içinde sabit sayı olarak YAZMA; USER PARAMETER olarak tanımla ve kullan:
+     params = design.userParameters
+     p = params.add('genislik_mm', adsk.core.ValueInput.createByString('50 mm'), 'mm', 'Açıklama')
+   - Mümkünse elle kesit çizip kesmek yerine GERÇEK Fusion özelliklerini kullan:
+     delikler için holeFeatures, kenar yuvarlatma için filletFeatures, pah için chamferFeatures.
+   - FEATURE SIRASI mantıklı olsun: önce ana gövdeler (extrude/revolve/sweep/loft),
+     sonra delik ve kesmeler (hole/cut), en son yüzey işlemleri (fillet/chamfer)
+     ve çoğaltmalar (pattern/mirror).`;
 
     function cleanExplanationText(text) {
       if (!text) return '';
@@ -3229,7 +3503,8 @@ CRITICAL ARCHITECTURAL RULES:
       return [];
     }
 
-    async function callLLM(provider, model, history, apiKey, healingInfo = null, baseUrl = null) {
+    async function callLLM(provider, model, history, apiKey, healingInfo = null, baseUrl = null, systemPromptOverride = null) {
+      const activeSystemPrompt = systemPromptOverride || SYSTEM_PROMPT;
       if (provider === 'google') {
         const contents = [];
         for (const turn of history) {
@@ -3263,7 +3538,7 @@ CRITICAL ARCHITECTURAL RULES:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents,
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            systemInstruction: { parts: [{ text: activeSystemPrompt }] },
             generationConfig: genConfig
           })
         });
@@ -3273,7 +3548,7 @@ CRITICAL ARCHITECTURAL RULES:
           if (thinkingMode && err?.error?.code === 400) {
             const res2 = await fetch(url, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, generationConfig: { temperature: 0.3 } })
+              body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: activeSystemPrompt }] }, generationConfig: { temperature: 0.3 } })
             });
             if (res2.ok) { const d2 = await res2.json(); return d2.candidates?.[0]?.content?.parts?.[0]?.text || ''; }
           }
@@ -3315,7 +3590,7 @@ CRITICAL ARCHITECTURAL RULES:
         try {
           const pyRes = await sendToFusionAsync('callLLM', {
             provider: 'anthropic', model,
-            messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+            messages: [{ role: 'system', content: activeSystemPrompt }, ...messages],
             apiKey
           });
           if (pyRes && pyRes.success && pyRes.reply) return pyRes.reply;
@@ -3334,8 +3609,10 @@ CRITICAL ARCHITECTURAL RULES:
           },
           body: JSON.stringify({
             model,
-            max_tokens: thinkingMode ? 16000 : 4096,
-            system: SYSTEM_PROMPT,
+            // Yapılandırılabilir yanıt uzunluğu (.env: AICAD_MAX_TOKENS, varsayılan 16384).
+            // Eski sabit değerler 4096/16000 idi; uzun CAD kodları kesilmesin diye yükseltildi.
+            max_tokens: thinkingMode ? Math.max(16000, getLLMMaxTokens()) : getLLMMaxTokens(),
+            system: activeSystemPrompt,
             messages,
             ...(thinkingMode ? {
               thinking: { type: 'enabled', budget_tokens: 10000 },
@@ -3365,7 +3642,7 @@ CRITICAL ARCHITECTURAL RULES:
         else if (provider === 'deepseek') chatUrl = 'https://api.deepseek.com/chat/completions';
         else if (provider === 'ollama') chatUrl = 'http://localhost:11434/v1/chat/completions';
 
-        const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+        const messages = [{ role: 'system', content: activeSystemPrompt }];
         for (const turn of history) {
           const turnImages = turn.role === 'user' ? getTurnImages(turn) : [];
           if (turnImages.length > 0) {
@@ -3441,6 +3718,472 @@ CRITICAL ARCHITECTURAL RULES:
           throw fetchErr;
         }
       }
+    }
+
+    // ── Paylaşılan Self-Healing döngüsü ──
+    // Mevcut hata onarma mantığı burada korunur; hem tek-atış akışı hem iki aşamalı
+    // hat aynı döngüyü kullanır (birleştirilmiş hal). opts.onStatus/onCode ile akış,
+    // kendi UI öğelerine durum yazar.
+    async function runHealingLoop(opts) {
+      let currentCode = opts.code;
+      let execRes = opts.execRes;
+      let attempts = 0;
+      let lastReply = null;
+      const MAX_HEALING_ATTEMPTS = 3;
+
+      while (!execRes?.success && !execRes?.devMode && attempts < MAX_HEALING_ATTEMPTS) {
+        attempts++;
+        const errMsg = execRes?.error || 'Bilinmeyen Fusion 360 API hatası';
+        const errTb = execRes?.traceback || '';
+
+        if (opts.onStatus) opts.onStatus('healing', errMsg, attempts, MAX_HEALING_ATTEMPTS);
+        addTyping();
+
+        let specificTip = '';
+        if (errMsg.includes('SÖZDİZİMİ HATASI')) {
+          specificTip = "ÖNEMLİ İPUCU: Kod Python sözdizimi hatası veriyor (ast.parse kontrolü). Girintileri, parantezleri ve satır sonlarını kontrol et.\n";
+        } else if (errMsg.includes('HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ') || errMsg.includes('No bodies added')) {
+          specificTip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile 3D katı gövdeye dönüştür.\n";
+        } else if (errMsg.includes('Kesilecek veya kesişecek hedef gövde bulunamadı')) {
+          specificTip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n";
+        } else if (errMsg.includes('profiles.item')) {
+          specificTip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n";
+        }
+
+        const healingPrompt = `Fusion 360 API şu hatayı verdi (${attempts}. deneme):\n${errMsg}\n\nDetaylı Traceback:\n${errTb}\n\n${specificTip}Lütfen hatanın nedenini gidererek eksiksiz, çalışan Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğunda tekrar üret. Sadece saf Python kodu döndür.`;
+
+        let rawHealingReply = '';
+        try {
+          rawHealingReply = await callLLM(opts.provider, opts.model, opts.history, opts.apiKey, {
+            previousCode: currentCode,
+            healingPrompt: healingPrompt
+          }, opts.baseUrl);
+        } catch(hErr) {
+          console.warn('Healing LLM error:', hErr);
+          break;
+        } finally {
+          removeTyping();
+        }
+
+        lastReply = rawHealingReply;
+        const healedCode = extractPythonCode(rawHealingReply);
+        if (!healedCode) {
+          console.warn('Healing did not yield code');
+          break;
+        }
+
+        currentCode = healedCode;
+        if (opts.onCode) opts.onCode(currentCode);
+        if (opts.onStatus) opts.onStatus('loading', null, attempts, MAX_HEALING_ATTEMPTS);
+
+        execRes = await sendToFusionAsync('executeCADCode', { code: currentCode });
+        if (execRes?.success) {
+          break;
+        }
+      }
+
+      return { execRes, code: currentCode, attempts, reply: lastReply };
+    }
+
+    // ── İki Aşamalı Üretim Hattı (Planner → Coder → Doğrulama) ──
+    async function pipelineHelper(op, payload = {}) {
+      try {
+        const res = await sendToFusionAsync('pipelineHelper', Object.assign({ op: op }, payload));
+        if (res && typeof res === 'object') return res;
+      } catch(e) {
+        console.warn('pipelineHelper hatası (' + op + '):', e);
+      }
+      return null;
+    }
+
+    function pipelinePlanMetrics(designState) {
+      if (!designState || !designState.has_design) {
+        return { has_design: false, bodies_count: 0, total_faces: 0, total_edges: 0, total_cylinder_faces: 0, total_volume_cm3: 0 };
+      }
+      const bodies = designState.bodies || [];
+      const sum = (key) => bodies.reduce((a, b) => a + (Number(b && b[key]) || 0), 0);
+      return {
+        has_design: true,
+        bodies_count: Number(designState.bodies_count) || bodies.length,
+        total_faces: Number(designState.total_faces) || sum('faces_count'),
+        total_edges: Number(designState.total_edges) || sum('edges_count'),
+        total_cylinder_faces: Number(designState.total_cylinder_faces) || sum('cylinder_faces_count'),
+        total_volume_cm3: Number(designState.total_volume_cm3) || sum('volume_cm3')
+      };
+    }
+
+    function isVisionCapableProvider(provider) {
+      return ['google', 'anthropic', 'openai', 'openrouter'].includes(provider);
+    }
+
+    function parseVisionVerdict(text) {
+      if (!text) return null;
+      try {
+        const m = text.match(/\{[\s\S]*?\}/);
+        if (m) {
+          const v = JSON.parse(m[0]);
+          if (typeof v.ok === 'boolean') return { ok: v.ok, issues: (v.issues || '').toString() };
+        }
+      } catch(e) { /* yumuşak yoruma düş */ }
+      const t = (text || '').toLowerCase();
+      if (t.includes('"ok": true') || /(uyuyor|uyumlu|eksik yok|sorun yok|uygundur)/.test(t)) {
+        return { ok: true, issues: '' };
+      }
+      return { ok: false, issues: (text || '').slice(0, 300) };
+    }
+
+    // Vision destekli sağlayıcılarla viewport görüntüsünü modele gösterip komutla karşılaştırır
+    async function callVisionCheck(provider, model, apiKey, baseUrl, imageDataUrl, command) {
+      const sysPrompt = 'You are a CAD QA inspector for Fusion 360 models. Compare the viewport screenshot with the user command. Reply ONLY with JSON: {"ok": true|false, "issues": "kısa Türkçe açıklama (eksik/uyumsuz neyse)"}';
+      const question = `Kullanıcı komutu: "${command}"\nEkteki Fusion 360 viewport görüntüsündeki 3D model bu komuta uyuyor mu? Eksik detay var mı? SADECE JSON döndür.`;
+      const b64 = (imageDataUrl.split(',')[1] || '');
+      try {
+        if (provider === 'google') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const res = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: question }, { inlineData: { mimeType: 'image/png', data: b64 } }] }],
+              systemInstruction: { parts: [{ text: sysPrompt }] },
+              generationConfig: { temperature: 0.1 }
+            })
+          });
+          if (!res.ok) return null;
+          const d = await res.json();
+          return parseVisionVerdict(d.candidates?.[0]?.content?.parts?.[0]?.text || '');
+        }
+        if (provider === 'anthropic') {
+          // Tarayıcı CORS engeli: önce Python köprüsü, olmazsa doğrudan fetch
+          try {
+            const pyRes = await sendToFusionAsync('callLLM', {
+              provider: 'anthropic', model, apiKey,
+              messages: [
+                { role: 'system', content: sysPrompt },
+                { role: 'user', content: [
+                  { type: 'image', source: { type: 'base64', media_type: 'image/png', data: b64 } },
+                  { type: 'text', text: question }
+                ] }
+              ]
+            });
+            if (pyRes && pyRes.success && pyRes.reply) return parseVisionVerdict(pyRes.reply);
+          } catch(e) { console.warn('Vision python köprüsü başarısız:', e); }
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+              model, max_tokens: getVisionMaxTokens(), system: sysPrompt,
+              messages: [{ role: 'user', content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/png', data: b64 } },
+                { type: 'text', text: question }
+              ] }]
+            })
+          });
+          if (!res.ok) return null;
+          const d = await res.json();
+          return parseVisionVerdict((d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n'));
+        }
+        // OpenAI-uyumlu (openai, openrouter)
+        let chatUrl = '';
+        if (provider === 'openai') chatUrl = 'https://api.openai.com/v1/chat/completions';
+        else if (provider === 'openrouter') chatUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        else return null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://fusion360.autodesk.com';
+          headers['X-Title'] = 'AI CAD Studio';
+        }
+        const res = await fetch(chatUrl, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: [ { type: 'text', text: question }, { type: 'image_url', image_url: { url: imageDataUrl } } ] }
+            ],
+            temperature: 0.1
+          })
+        });
+        if (!res.ok) return null;
+        const d = await res.json();
+        return parseVisionVerdict(d.choices?.[0]?.message?.content || '');
+      } catch(e) {
+        console.warn('Vision kontrol atlandı:', e);
+        return null;
+      }
+    }
+
+    // Plan adım listesi UI yardımcıları
+    let pipelineUi = null;
+
+    function buildPipelineMessage(plan, designState) {
+      let html = '';
+      if (designState && designState.has_design && designState.bodies_count > 0) {
+        html += `<div style="font-size:11.5px;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(56,189,248,0.08);padding:4px 9px;border-radius:6px;border:1px solid rgba(56,189,248,0.2);"><span>📐</span><span>Mevcut model okundu (<b>${designState.bodies_count} gövde</b> referans alındı)</span></div>`;
+      }
+      const paramCount = (plan.parameters || []).length;
+      html += `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📋 <b>Modelleme Planı</b> — ${plan.features.length} adım${paramCount ? ` · ${paramCount} parametre` : ''}:</div>`;
+      html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">`;
+      plan.features.forEach((f, i) => {
+        html += `
+          <div id="pstep_${i}" style="display:flex;align-items:flex-start;gap:7px;font-size:12px;padding:5px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:7px;transition:border-color .2s;">
+            <span id="pstepIcon_${i}" style="min-width:16px;">⏳</span>
+            <span style="flex:1;line-height:1.4;">
+              <b style="color:#cdd6e0;">${esc(f.id)}</b>
+              <span style="font-size:10px;background:rgba(0,229,255,.1);color:#00e5ff;padding:1px 6px;border-radius:4px;margin-left:4px;">${esc(f.type)}</span><br/>
+              <span style="color:#8b98a5;font-size:11px;">${esc(f.description || '')}</span><span id="pstepNote_${i}" style="color:#e5c07b;font-size:10.5px;"></span>
+            </span>
+          </div>`;
+      });
+      html += `</div>`;
+      html += `<div id="pipelineStatusLines" style="display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:#9aa6b2;margin-bottom:6px;"></div>`;
+      html += `<div class="status-badge loading" id="pipelineFinalStatus">⚙️ Adımlar Fusion 360 içinde uygulanıyor...</div>`;
+      html += `
+        <div style="margin-top:6px;">
+          <span style="font-size:10.5px;color:#555;cursor:pointer;user-select:none;" onclick="const el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.textContent=el.style.display==='none'?'[+ Teknik Kod]':'[- Teknik Kodu Gizle]';">[+ Teknik Kod]</span>
+          <pre style="display:none;margin-top:4px;padding:8px 10px;font-size:11px;background:#090d13;border:1px solid #1a2230;border-radius:6px;color:#8b949e;overflow-x:auto;max-height:180px;"><code id="pipelineCodeBlock"></code></pre>
+        </div>`;
+      return addMsg('ai', html);
+    }
+
+    function addPipelineNote(text, color) {
+      if (!pipelineUi || !pipelineUi.statusLines) return;
+      const div = document.createElement('div');
+      div.style.color = color || '#9aa6b2';
+      div.textContent = text;
+      pipelineUi.statusLines.appendChild(div);
+    }
+
+    function setPipelineStep(i, status, note) {
+      if (!pipelineUi) return;
+      const icon = document.getElementById('pstepIcon_' + i);
+      const noteEl = document.getElementById('pstepNote_' + i);
+      const row = document.getElementById('pstep_' + i);
+      const icons = { pending: '⏳', running: '⚙️', healing: '🔧', done: '✅', failed: '❌' };
+      if (icon) icon.textContent = icons[status] || '⏳';
+      if (row) row.style.borderColor = status === 'failed' ? 'rgba(239,68,68,.4)' : (status === 'done' ? 'rgba(74,222,128,.25)' : 'rgba(255,255,255,0.06)');
+      if (noteEl) noteEl.textContent = note ? ` — ${note}` : '';
+    }
+
+    function setPipelineFinal(kind, text) {
+      if (!pipelineUi || !pipelineUi.final) return;
+      pipelineUi.final.className = 'status-badge ' + (kind === 'error' ? 'error' : (kind === 'healing' ? 'healing' : 'success'));
+      pipelineUi.final.innerHTML = text;
+    }
+
+    function appendPipelineCode(header, code) {
+      if (!pipelineUi || !pipelineUi.code) return;
+      pipelineUi.code.textContent += (pipelineUi.code.textContent ? '\n\n' : '') + `# ===== ${header} =====\n` + code;
+    }
+
+    function finishPipelineHistory(plan, featureCodes) {
+      // Sonraki "devam et" istekleri bağlamı kaybetmesin: üretilen kodları geçmişe ekle
+      const allCodes = (plan.features || []).map(f => featureCodes[f.id]).filter(Boolean).join('\n\n');
+      conversationHistory.push({ role: 'assistant', text: '```python\n' + (allCodes || '# (kod üretilemedi)') + '\n```' });
+      saveCurrentConversation();
+    }
+
+    /**
+     * İki aşamalı hattın ana akışı.
+     * Döner: true (istek bu akışla tamamlandı) | 'fallback' | 'chat' (tek-atış akışına düş)
+     */
+    async function runPipelineFlow(ctx) {
+      pipelineUi = null;
+
+      // Planner/Coder için ayrı model yapılandırması
+      // Öncelik: UI seçimi (localStorage) > .env/config.py > sohbet modeli
+      const mainConn = { provider: ctx.provider, model: ctx.model, apiKey: ctx.apiKey, baseUrl: ctx.baseUrl };
+      const stageConns = getPipelineModelSettings(mainConn);
+      const plannerConn = stageConns.planner;
+      const coderConn = stageConns.coder;
+
+      // 0) Basit komut kuralı: tek silindir/kutu isteklerinde planner'ı atla
+      let plan = null;
+      let wasSimple = false;
+      const simple = await pipelineHelper('simpleCheck', { prompt: ctx.prompt || '' });
+      if (simple && simple.ok === false) return 'fallback';
+      if (simple && simple.simple && simple.plan) {
+        plan = simple.plan;
+        wasSimple = true;
+      }
+
+      // 1) Planner: LLM'den yalnızca JSON plan iste
+      if (!plan) {
+        const pp = await pipelineHelper('plannerPrompt', {});
+        if (!pp || !pp.system) return 'fallback';
+        const rawPlan = await callLLM(plannerConn.provider, plannerConn.model, ctx.conversationHistory, plannerConn.apiKey, null, plannerConn.baseUrl, pp.system);
+        let v = await pipelineHelper('validatePlan', { raw: rawPlan });
+        if (!v) return 'fallback';
+        if (!v.ok) {
+          // 2) JSON bozuk geldi → bir kez yeniden iste
+          console.warn('Plan JSON bozuk, bir kez daha isteniyor:', v.error);
+          const repair = await callLLM(plannerConn.provider, plannerConn.model,
+            [...ctx.conversationHistory,
+             { role: 'assistant', text: rawPlan },
+             { role: 'user', text: `Döndürdüğün yanıt geçerli bir plan JSON'u değil: ${v.error}\nSADECE şemaya uygun geçerli JSON döndür.` }],
+            plannerConn.apiKey, null, plannerConn.baseUrl, pp.system);
+          v = await pipelineHelper('validatePlan', { raw: repair });
+          if (!v || !v.ok) return 'fallback'; // 3) yine bozuksa eski tek-atış akışına düş
+        }
+        if (v.chat) return 'chat';
+        plan = v.plan;
+      }
+
+      if (!plan || !plan.features || !plan.features.length) return 'fallback';
+
+      // 4) Planı sohbet alanında adım listesi olarak göster
+      removeTyping();
+      const aiMsgElem = buildPipelineMessage(plan, ctx.designState);
+      pipelineUi = {
+        msg: aiMsgElem,
+        statusLines: aiMsgElem.querySelector('#pipelineStatusLines'),
+        final: aiMsgElem.querySelector('#pipelineFinalStatus'),
+        code: aiMsgElem.querySelector('#pipelineCodeBlock')
+      };
+      if (wasSimple) addPipelineNote('⚡ Basit komut algılandı: planner atlandı, tek adımlı plan oluşturuldu.', '#38bdf8');
+      if (plannerConn !== mainConn || coderConn !== mainConn) {
+        addPipelineNote(`🤖 Modeller — 📋 Planner: ${plannerConn.model} · 🧑‍💻 Coder: ${coderConn.model}`, '#38bdf8');
+      }
+
+      // 5) Coder: her feature için ayrı LLM çağrısı; kodlar sırayla çalıştırılır
+      const before = pipelinePlanMetrics(ctx.designState);
+      const contextSummary = (ctx.designState && ctx.designState.summary_text) || '';
+      const prevSummaries = [];
+      const featureCodes = {};
+      let anySuccess = false;
+
+      const runFeatureCoding = async (i, promptObj, kindLabel) => {
+        const f = plan.features[i];
+        let raw = '';
+        try {
+          raw = await callLLM(coderConn.provider, coderConn.model, [{ role: 'user', text: promptObj.user }], coderConn.apiKey, null, coderConn.baseUrl, promptObj.system);
+        } catch(e) {
+          console.warn(`Coder çağrısı hatası (${f.id}):`, e);
+        }
+        let code = extractPythonCode(raw);
+        if (!code) {
+          setPipelineStep(i, 'failed', 'kod üretilemedi');
+          return { ok: false, execRes: null };
+        }
+        featureCodes[f.id] = code;
+        appendPipelineCode(`${f.id} (${f.type})`, code);
+        setPipelineStep(i, 'running', kindLabel || null);
+        let execRes = await sendToFusionAsync('executeCADCode', { code });
+        const healing = await runHealingLoop({
+          code, execRes,
+          history: [{ role: 'user', text: promptObj.user }],
+          provider: coderConn.provider, model: coderConn.model, apiKey: coderConn.apiKey, baseUrl: coderConn.baseUrl,
+          onStatus: (st, errMsg, att, maxAtt) => setPipelineStep(i, 'healing', st === 'healing'
+            ? `${formatFusionErrorInTurkish(errMsg)} — onarılıyor (${att}/${maxAtt})`
+            : `onarılan kod test ediliyor (${att}/${maxAtt})...`),
+          onCode: (c) => { featureCodes[f.id] = c; }
+        });
+        execRes = healing.execRes;
+        if (execRes && execRes.success) {
+          featureCodes[f.id] = healing.code;
+          anySuccess = true;
+          const newBodies = (execRes.new_bodies || []).join(', ');
+          prevSummaries.push(`✓ ${f.id} (${f.type}): ${f.description}` + (newBodies ? ` → ${newBodies} gövdesi eklendi` : ''));
+          setPipelineStep(i, 'done');
+          return { ok: true, execRes };
+        }
+        setPipelineStep(i, 'failed', execRes && execRes.devMode ? 'Fusion bağlı değil' : formatFusionErrorInTurkish((execRes && execRes.error) || 'Bilinmeyen hata'));
+        return { ok: false, execRes };
+      };
+
+      for (let i = 0; i < plan.features.length; i++) {
+        setPipelineStep(i, 'running');
+        const cp = await pipelineHelper('coderPrompt', {
+          plan, feature: plan.features[i],
+          prev_summaries: prevSummaries, context_summary: contextSummary
+        });
+        if (!cp || !cp.user) {
+          setPipelineStep(i, 'failed', 'prompt kurulamadı');
+          continue;
+        }
+        const r = await runFeatureCoding(i, cp);
+        if (r.execRes && r.execRes.devMode) {
+          setPipelineFinal('error', `⚠️ <b>Fusion 360 bağlı değil:</b> adımlar uygulanamadı. Üretilen kodlar [+ Teknik Kod] bölümünde.`);
+          finishPipelineHistory(plan, featureCodes);
+          return true;
+        }
+      }
+
+      if (!anySuccess) {
+        setPipelineFinal('error', '❌ <b>Hiçbir adım uygulanamadı.</b> Detaylar adım notlarında ve [+ Teknik Kod] bölümünde.');
+        finishPipelineHistory(plan, featureCodes);
+        return true;
+      }
+
+      // 6) Doğrulama döngüsü: geometri + vision — en fazla 2 düzeltme turu
+      const runVerificationRound = async () => {
+        const v = await pipelineHelper('verifyPlan', { plan, before });
+        if (!v || v.skipped) {
+          addPipelineNote('🔍 Doğrulama atlandı (tasarım durumu okunamadı).');
+          return { ok: true, issues: [] };
+        }
+        const issues = (v.issues || []).map(it => (typeof it === 'string') ? { text: it, features: [] } : it);
+        addPipelineNote(`🔍 Doğrulama — ${v.metrics || ''}` + (issues.length ? ` → uyuşmazlık: ${issues[0].text}` : ' — planla uyumlu ✅'),
+          issues.length ? '#e5c07b' : '#4ade80');
+
+        // Vision adımı: geometri uyumluysa ve sağlayıcı vision destekliyorsa viewport kontrolü
+        if (!issues.length && visionVerifyEnabled && isVisionCapableProvider(ctx.provider)) {
+          const shot = await pipelineHelper('captureViewport', {});
+          if (shot && shot.success && shot.image) {
+            const verdict = await callVisionCheck(ctx.provider, ctx.model, ctx.apiKey, ctx.baseUrl, shot.image, ctx.prompt || ctx.effectivePrompt);
+            if (verdict) {
+              addPipelineNote(verdict.ok ? '👁️ Görsel kontrol: model komuta uyuyor ✅' : `👁️ Görsel kontrol: eksik/uyumsuzluk — ${verdict.issues}`,
+                verdict.ok ? '#4ade80' : '#e5c07b');
+              if (!verdict.ok && verdict.issues) {
+                issues.push({ text: 'Görsel kontrol uyuşmazlığı: ' + verdict.issues, features: [] });
+              }
+            }
+          }
+        }
+        return { ok: issues.length === 0, issues };
+      };
+
+      let verify = await runVerificationRound();
+      let tours = 0;
+      while (!verify.ok && tours < 2) {
+        tours++;
+        addPipelineNote(`🔁 Düzeltme turu ${tours}/2: uyuşmazlıklar Coder'a gönderiliyor...`, '#38bdf8');
+        const issueText = verify.issues.map(it => it.text).join('\n');
+        // Hedef unsurlar: uyuşmazlığın işaret ettiği feature'lar (boşsa tümü)
+        let targets = [];
+        verify.issues.forEach(it => { (it.features || []).forEach(fid => { if (!targets.includes(fid)) targets.push(fid); }); });
+        if (!targets.length) targets = plan.features.map(f => f.id);
+        let correctedAny = false;
+        for (let i = 0; i < plan.features.length; i++) {
+          const f = plan.features[i];
+          if (!targets.includes(f.id)) continue;
+          const rp = await pipelineHelper('correctionPrompt', {
+            plan, feature: f, issues: issueText,
+            current_code: featureCodes[f.id] || '',
+            prev_summaries: prevSummaries, context_summary: contextSummary
+          });
+          if (!rp || !rp.user) continue;
+          setPipelineStep(i, 'healing', 'doğrulama düzeltmesi');
+          const r = await runFeatureCoding(i, rp, 'doğrulama düzeltmesi');
+          if (r.ok) correctedAny = true;
+          if (r.execRes && r.execRes.devMode) break;
+        }
+        if (!correctedAny) {
+          addPipelineNote('⚠️ Düzeltme turunda başarı sağlanamadı; model son haline bırakılıyor.', '#e5c07b');
+          break;
+        }
+        verify = await runVerificationRound();
+      }
+
+      // 7) Final durum
+      if (verify.ok) {
+        setPipelineFinal('success', `✅ <b>Model doğrulanarak oluşturuldu!</b> <span style="font-weight:400">${esc(verify.metrics || '')}</span>`);
+      } else {
+        setPipelineFinal('healing', `⚠️ <b>Model oluşturuldu ancak doğrulama uyarısı sürüyor</b> (${tours}/2 tur): ${esc(((verify.issues[0] || {}).text) || '')}`);
+      }
+      finishPipelineHistory(plan, featureCodes);
+      getCurrentDesignState().then(st => updateWorkspaceStatusBadge(st)).catch(() => {});
+      return true;
     }
 
     // ── Generate & Self-Healing Loop ──
@@ -3537,6 +4280,36 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
       try {
         addTyping();
 
+        // ── 0. MOD: İKİ AŞAMALI HAT (Planner → Coder → Doğrulama) ──
+        // Görsel ek yoksa yeni hattı dene; planner JSON'u bozuk gelirse veya hat
+        // herhangi bir nedenle aksarsa eski tek-atış akışı (fallback) devreye girer.
+        let pipelineResult = null;
+        if (currentImages.length === 0) {
+          try {
+            pipelineResult = await runPipelineFlow({
+              prompt: prompt,
+              effectivePrompt: effectivePrompt,
+              conversationHistory: conversationHistory,
+              designState: designState,
+              provider: activeProvider,
+              model: activeModel,
+              apiKey: activeApiKey,
+              baseUrl: activeBaseUrl
+            });
+          } catch(pipeErr) {
+            console.warn('Pipeline akışı hata verdi, tek-atış akışına dönülüyor:', pipeErr);
+            pipelineResult = 'fallback';
+          }
+        }
+        if (pipelineResult === true) {
+          removeTyping();
+          return;
+        }
+
+        // pipelineResult: 'fallback' | 'chat' | null → eski tek-atış akışı
+        removeTyping();
+        addTyping();
+
         let rawReply = '';
         try {
           rawReply = await callLLM(activeProvider, activeModel, conversationHistory, activeApiKey, null, activeBaseUrl);
@@ -3601,67 +4374,38 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
         const checkInEl = aiMsgElem.querySelector('#checkInBarContainer');
         const codeBlockEl = aiMsgElem.querySelector('#cadCodeBlock');
 
-        // ── 3. MOD: MULTI-ATTEMPT SELF-HEALING (Hata Onarımı - 3 Denemeye Kadar) ──
-        let attempts = 0;
+        // ── 3. MOD: MULTI-ATTEMPT SELF-HEALING (paylaşılan döngü — runHealingLoop) ──
+        // Orijinal onarma mantığı runHealingLoop içine taşındı (silinmedi, birleştirildi);
+        // hem bu akış hem iki aşamalı hat aynı döngüyü kullanır.
+        const healing = await runHealingLoop({
+          code: currentCode,
+          execRes: execRes,
+          history: conversationHistory,
+          provider: activeProvider,
+          model: activeModel,
+          apiKey: activeApiKey,
+          baseUrl: activeBaseUrl,
+          onStatus: (kind, errMsg, att, maxAtt) => {
+            if (!statusEl) return;
+            if (kind === 'healing') {
+              statusEl.className = 'status-badge healing';
+              const fusionErrTr = formatFusionErrorInTurkish(errMsg);
+              statusEl.innerHTML = `🔧 <b>Sorun tespit edildi (${att}/${maxAtt}):</b> ${esc(fusionErrTr)}<br/><span style="font-size:11.5px;opacity:0.9">Yapay zeka sorunu gidermek için kodu onarıyor...</span>`;
+            } else {
+              statusEl.className = 'status-badge loading';
+              statusEl.innerHTML = `⚙️ Onarılan kod Fusion 360 içinde test ediliyor (${att}/${maxAtt})...`;
+            }
+          },
+          onCode: (c) => {
+            currentCode = c;
+            if (codeBlockEl) codeBlockEl.textContent = currentCode;
+          }
+        });
+        execRes = healing.execRes;
+        currentCode = healing.code;
+        if (healing.reply) currentReply = healing.reply;
+        const attempts = healing.attempts;
         const MAX_HEALING_ATTEMPTS = 3;
-
-        while (!execRes?.success && !execRes?.devMode && attempts < MAX_HEALING_ATTEMPTS) {
-          attempts++;
-          const errMsg = execRes?.error || 'Bilinmeyen Fusion 360 API hatası';
-          const errTb = execRes?.traceback || '';
-
-          if (statusEl) {
-            statusEl.className = 'status-badge healing';
-            const fusionErrTr = formatFusionErrorInTurkish(errMsg);
-            statusEl.innerHTML = `🔧 <b>Sorun tespit edildi (${attempts}/${MAX_HEALING_ATTEMPTS}):</b> ${esc(fusionErrTr)}<br/><span style="font-size:11.5px;opacity:0.9">Yapay zeka sorunu gidermek için kodu onarıyor...</span>`;
-          }
-
-          addTyping();
-
-          let specificTip = '';
-          if (errMsg.includes('HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ') || errMsg.includes('No bodies added')) {
-            specificTip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile 3D katı gövdeye dönüştür.\n";
-          } else if (errMsg.includes('Kesilecek veya kesişecek hedef gövde bulunamadı')) {
-            specificTip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n";
-          } else if (errMsg.includes('profiles.item')) {
-            specificTip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n";
-          }
-
-          const healingPrompt = `Fusion 360 API şu hatayı verdi (${attempts}. deneme):\n${errMsg}\n\nDetaylı Traceback:\n${errTb}\n\n${specificTip}Lütfen hatanın nedenini gidererek eksiksiz, çalışan Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğunda tekrar üret. Sadece saf Python kodu döndür.`;
-
-          let rawHealingReply = '';
-          try {
-            rawHealingReply = await callLLM(activeProvider, activeModel, conversationHistory, activeApiKey, {
-              previousCode: currentCode,
-              healingPrompt: healingPrompt
-            }, activeBaseUrl);
-          } catch(hErr) {
-            console.warn('Healing LLM error:', hErr);
-            break;
-          } finally {
-            removeTyping();
-          }
-
-          const healedCode = extractPythonCode(rawHealingReply);
-          if (!healedCode) {
-            console.warn('Healing did not yield code');
-            break;
-          }
-
-          currentCode = healedCode;
-          currentReply = rawHealingReply;
-          if (codeBlockEl) codeBlockEl.textContent = currentCode;
-
-          if (statusEl) {
-            statusEl.className = 'status-badge loading';
-            statusEl.innerHTML = `⚙️ Onarılan kod Fusion 360 içinde test ediliyor (${attempts}/${MAX_HEALING_ATTEMPTS})...`;
-          }
-
-          execRes = await sendToFusionAsync('executeCADCode', { code: currentCode });
-          if (execRes?.success) {
-            break;
-          }
-        }
 
         if (execRes && execRes.success) {
           if (statusEl) {

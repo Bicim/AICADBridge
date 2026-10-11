@@ -7,8 +7,9 @@ import traceback
 
 import adsk.core
 
-from aicad_bridge import runtime, worker
+from aicad_bridge import config as app_config, runtime, worker
 from aicad_bridge.adapters import fusion360
+from aicad_bridge.llm import pipeline
 from aicad_bridge.llm.client import call_llm_api
 from aicad_bridge.llm.models import fetch_models
 from aicad_bridge.messaging import send_palette_message
@@ -82,6 +83,35 @@ class PaletteHTMLEventHandler(adsk.core.HTMLEventHandler):
                 aicad_log("generateCAD arka plan görevi başlatılıyor...")
                 html_args.returnData = json.dumps({'status': 'generateCAD_started'})
                 threading.Thread(target=worker.generate_cad_worker, args=(data,), daemon=True).start()
+                return
+
+            elif action == 'getConfig':
+                # .env / config.py tabanlı yapılandırmayı UI'ya döndürür
+                # (planner/coder model varsayılanları, max_tokens, yedek model listesi)
+                try:
+                    res = app_config.get_public_settings()
+                except Exception as e:
+                    aicad_log(f"getConfig hatası: {e}")
+                    res = {}
+                html_args.returnData = json.dumps(res)
+                return
+
+            elif action == 'pipelineHelper':
+                # İki aşamalı hat (Planner/Coder) yardımcıları.
+                # LLM çağrısı YAPMAZ; prompt kurma, plan doğrulama, snippet seçimi,
+                # geometrik doğrulama ve viewport görüntüsü gibi hızlı işler yapar.
+                # Handler zaten Fusion ana thread'inde çalıştığı için inspect ve
+                # viewport yakalama doğrudan çağrılır.
+                try:
+                    res = pipeline.run_pipeline_helper(
+                        data,
+                        inspect_state=fusion360.inspect_current_design,
+                        capture_viewport=fusion360.capture_viewport_image)
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    aicad_log(f"pipelineHelper hatası: {e}\n{tb}")
+                    res = {'ok': False, 'error': str(e)}
+                html_args.returnData = json.dumps(res)
                 return
 
             elif action in ('getDesignState', 'inspectDesign'):
