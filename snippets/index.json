@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "description": "AICADBridge Fusion 360 API snippet kütüphanesi dizini.",
+  "notes": [
+    "Ölçüler snippet içinde mm olarak tanımlanır, Fusion API'nin dahili birimi cm'ye (/10) çevrilir.",
+    "Snippet'ler Fusion ana thread'inde, mevcut köprüdeki execute_code akışı üzerinden yürütülmek üzere yazılmıştır (ui.messageBox ve try/except yutma YASAK).",
+    "TODO ile işaretlenmiş API çağrıları Fusion API dokümanından doğrulanmalıdır.",
+    "Anahtar kelime araması loader.py içinde Türkçe karakter katlamasıyla (ç→c, ğ→g, ...) çalışır."
+  ],
+  "snippets": [
+    {
+      "id": "sketch_circle_extrude",
+      "feature_type": "extrude",
+      "keywords": {
+        "tr": ["daire", "çember", "silindir", "boru", "mil", "tekerlek", "yuvarlak", "uzatma", "ekstrüzyon"],
+        "en": ["circle", "cylinder", "tube", "shaft", "wheel", "round", "extrude", "boss"]
+      },
+      "file": "snippets/sketch_circle_extrude.py"
+    },
+    {
+      "id": "sketch_rectangle_extrude",
+      "feature_type": "extrude",
+      "keywords": {
+        "tr": ["dikdörtgen", "kare", "kutu", "plaka", "tabla", "prizma", "blok", "uzatma"],
+        "en": ["rectangle", "square", "box", "plate", "prism", "block", "extrude"]
+      },
+      "file": "snippets/sketch_rectangle_extrude.py"
+    },
+    {
+      "id": "extrude_cut",
+      "feature_type": "cut",
+      "keywords": {
+        "tr": ["kesme", "kesit", "yuva", "oluk", "kanal", "cep", "pocket", "boşluk", "malzeme kaldırma"],
+        "en": ["cut", "pocket", "slot", "groove", "channel", "remove material", "subtract"]
+      },
+      "file": "snippets/extrude_cut.py"
+    },
+    {
+      "id": "hole_feature",
+      "feature_type": "hole",
+      "keywords": {
+        "tr": ["delik", "matkap", "cıvata deliği", "geçme deliği", "montaj deliği"],
+        "en": ["hole", "drill", "bore", "bolt hole", "through hole"]
+      },
+      "file": "snippets/hole_feature.py"
+    },
+    {
+      "id": "fillet_edges",
+      "feature_type": "fillet",
+      "keywords": {
+        "tr": ["yuvarlatma", "yuvarlat", "radius", "radyüs", "kenar yumuşatma", "köşe yumuşatma"],
+        "en": ["fillet", "round", "radius", "edge rounding"]
+      },
+      "file": "snippets/fillet_edges.py"
+    },
+    {
+      "id": "chamfer_edges",
+      "feature_type": "chamfer",
+      "keywords": {
+        "tr": ["pah", "pah kır", "kenar kır", "eğik kenar", "kenar kesme"],
+        "en": ["chamfer", "bevel", "edge break", "countersink"]
+      },
+      "file": "snippets/chamfer_edges.py"
+    },
+    {
+      "id": "circular_pattern",
+      "feature_type": "pattern",
+      "keywords": {
+        "tr": ["dairesel desen", "desen", "çoğaltma", "bolt circle", "etrafına ekle", "tekrar", "dizilim"],
+        "en": ["circular pattern", "radial pattern", "array", "bolt circle", "repeat", "rotate copies"]
+      },
+      "file": "snippets/circular_pattern.py"
+    },
+    {
+      "id": "rectangular_pattern",
+      "feature_type": "pattern",
+      "keywords": {
+        "tr": ["düzgün desen", "desen", "ızgara", "grid", "sıralı çoğaltma", "doğrultuda tekrar"],
+        "en": ["rectangular pattern", "linear pattern", "grid", "array", "repeat"]
+      },
+      "file": "snippets/rectangular_pattern.py"
+    },
+    {
+      "id": "mirror_feature",
+      "feature_type": "mirror",
+      "keywords": {
+        "tr": ["ayna", "aynala", "simetri", "simetrik", "yansıt", "kopya"],
+        "en": ["mirror", "symmetry", "symmetric", "reflect", "copy"]
+      },
+      "file": "snippets/mirror_feature.py"
+    },
+    {
+      "id": "shell_body",
+      "feature_type": "shell",
+      "keywords": {
+        "tr": ["kabuk", "içi boş", "ince cidar", "hollow", "içini oy"],
+        "en": ["shell", "hollow", "thin wall", "wall thickness"]
+      },
+      "file": "snippets/shell_body.py"
+    },
+    {
+      "id": "revolve_profile",
+      "feature_type": "revolve",
+      "keywords": {
+        "tr": ["döndürme", "döndür", "torna", "simetrik gövde", "halka", "koni", "huni", "kap"],
+        "en": ["revolve", "rotate", "lathe", "axisymmetric", "ring", "cone"]
+      },
+      "file": "snippets/revolve_profile.py"
+    },
+    {
+      "id": "sweep_path",
+      "feature_type": "sweep",
+      "keywords": {
+        "tr": ["tarama", "yol boyunca", "boru", "kanal", "eğri boyunca uzat", "sweep"],
+        "en": ["sweep", "path", "along curve", "pipe", "tube along path"]
+      },
+      "file": "snippets/sweep_path.py"
+    },
+    {
+      "id": "loft_profiles",
+      "feature_type": "loft",
+      "keywords": {
+        "tr": ["loft", "geçiş", "ara kesit", "kesitler arası", "organik form"],
+        "en": ["loft", "blend", "transition", "cross section", "morph"]
+      },
+      "file": "snippets/loft_profiles.py"
+    },
+    {
+      "id": "user_parameters",
+      "feature_type": "parameter",
+      "keywords": {
+        "tr": ["parametre", "değişken ölçü", "ölçü değiştir", "yeniden boyutlandırma", "parametrik"],
+        "en": ["parameter", "user parameter", "variable", "dimension", "parametric"]
+      },
+      "file": "snippets/user_parameters.py"
+    },
+    {
+      "id": "construction_plane",
+      "feature_type": "construction",
+      "keywords": {
+        "tr": ["yapı düzlemi", "ofset düzlem", "referans düzlem", "çalışma düzlemi", "yükseklikte düzlem"],
+        "en": ["construction plane", "offset plane", "reference plane", "work plane"]
+      },
+      "file": "snippets/construction_plane.py"
+    },
+    {
+      "id": "combine_bodies",
+      "feature_type": "combine",
+      "keywords": {
+        "tr": ["birleştir", "gövde birleştirme", "kaynat", "boolean", "kes", "ekle"],
+        "en": ["combine", "join", "union", "boolean", "subtract", "cut bodies"]
+      },
+      "file": "snippets/combine_bodies.py"
+    }
+  ]
+}
