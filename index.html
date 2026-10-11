@@ -867,7 +867,7 @@
         <div class="chat-area" id="chatArea">
           <div class="welcome" id="welcomeScreen">
             <div class="welcome-greeting" id="greetingText">İyi günler, Yunus!</div>
-            <div class="welcome-sub">Fusion 360'ta serbestçe fikir danışabilir, referans görsel yükleyebilir veya doğrudan 3D model tasarlatabilirsin.</div>
+            <div class="welcome-sub">Fusion 360'ta serbestçe fikir danışabilir, referans görsel veya eskiz/dosya (DXF, SVG, TXT) yükleyebilir ya da doğrudan 3D model tasarlatabilirsin.</div>
             <div class="quick-actions">
               <div class="quick-chip" onclick="sendQuick('Uçak oluşturmak istiyorum bu uçağın tasarımını nasıl yapalım sence?')">✈️ Uçak Tasarımı Danış</div>
               <div class="quick-chip" onclick="quickInspectDesign()">🔍 Mevcut Tasarımı İncele</div>
@@ -892,15 +892,15 @@
           </div>
 
           <div class="input-bar">
-            <button type="button" class="btn-attach" id="btnAttach" onclick="document.getElementById('imageFileInput').click()" title="Referans Görsel Ekle (veya Ctrl+V ile yapıştır)">
+            <button type="button" class="btn-attach" id="btnAttach" onclick="document.getElementById('imageFileInput').click()" title="Eskiz / Dosya Ekle (görsel, DXF, SVG, TXT, CSV — veya Ctrl+V / sürükle-bırak)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                 <circle cx="8.5" cy="8.5" r="1.5"></circle>
                 <polyline points="21 15 16 10 5 21"></polyline>
               </svg>
             </button>
-            <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
-            <textarea id="promptInput" placeholder="Bir fikir sor, uçak/parça tarif et veya görsel yükle..." rows="1"
+            <input type="file" id="imageFileInput" accept="image/*,.txt,.md,.csv,.json,.svg,.dxf" multiple style="display:none" onchange="handleFileSelect(event)">
+            <textarea id="promptInput" placeholder="Bir fikir sor, parça tarif et veya eskiz/dosya ekle..." rows="1"
                       onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
             <button class="btn-send" id="btnSend" onclick="generateCAD()" title="Gönder">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405z"/></svg>
@@ -2458,7 +2458,8 @@
 
     // ── Chat & Conversation State ──
     let conversationHistory = [];
-    let attachedImage = null; // { dataUrl, base64, mimeType, name }
+    let attachedFiles = []; // { kind:'image', dataUrl, base64, mimeType, name } | { kind:'text', name, content }
+    const MAX_TEXT_FILE_CHARS = 150000;
 
     function autoResize(el) {
       el.style.height = 'auto';
@@ -2569,48 +2570,116 @@
       }
     }
 
-    // ── Image Attachment Handling ──
-    function handleImageSelect(e) {
-      const file = e.target.files?.[0];
-      if (file) processImageFile(file);
+    // ── File Attachment Handling (görsel + metin dosyaları) ──
+    function isTextFile(file) {
+      if (file.type && file.type.startsWith('text/')) return true;
+      return /\.(txt|md|csv|json|svg|dxf)$/i.test(file.name || '');
+    }
+
+    function handleFileSelect(e) {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        for (const file of files) processSelectedFile(file);
+      }
       e.target.value = '';
     }
 
-    function processImageFile(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        alert('Lütfen geçerli bir resim dosyası seçin (PNG, JPG, WEBP vb.)');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target.result;
-        const base64 = dataUrl.split(',')[1];
-        setAttachedImage({
-          dataUrl,
-          base64,
-          mimeType: file.type || 'image/png',
-          name: file.name || 'referans_gorsel.png'
-        });
-      };
-      reader.readAsDataURL(file);
+    function handleImageSelect(e) {
+      handleFileSelect(e);
     }
 
-    function setAttachedImage(imgObj) {
-      attachedImage = imgObj;
-      const tray = document.getElementById('imagePreviewTray');
-      const thumb = document.getElementById('imagePreviewThumb');
-      const nameEl = document.getElementById('imagePreviewName');
-      if (tray && thumb && nameEl) {
-        thumb.src = imgObj.dataUrl;
-        nameEl.textContent = imgObj.name;
-        tray.style.display = 'flex';
+    function processSelectedFile(file) {
+      if (!file) return;
+      if (file.type && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target.result;
+          const base64 = dataUrl.split(',')[1];
+          attachedFiles.push({
+            kind: 'image',
+            dataUrl,
+            base64,
+            mimeType: file.type || 'image/png',
+            name: file.name || 'referans_gorsel.png'
+          });
+          renderAttachedTray();
+        };
+        reader.readAsDataURL(file);
+      } else if (isTextFile(file)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          let content = e.target.result || '';
+          let truncated = false;
+          if (content.length > MAX_TEXT_FILE_CHARS) {
+            content = content.substring(0, MAX_TEXT_FILE_CHARS);
+            truncated = true;
+          }
+          attachedFiles.push({
+            kind: 'text',
+            name: file.name || 'ek_dosya.txt',
+            content: truncated ? content + '\n[...DOSYA ÇOK UZUN, KISILDI...]' : content
+          });
+          renderAttachedTray();
+        };
+        reader.readAsText(file);
+      } else {
+        alert('Desteklenen dosya türleri: resimler (PNG, JPG, WEBP) ve metin tabanlı dosyalar (TXT, MD, CSV, JSON, SVG, DXF).');
       }
+    }
+
+    function processImageFile(file) {
+      processSelectedFile(file);
+    }
+
+    function renderAttachedTray() {
+      const tray = document.getElementById('imagePreviewTray');
+      if (!tray) return;
+      tray.innerHTML = '';
+      if (attachedFiles.length === 0) {
+        tray.style.display = 'none';
+        return;
+      }
+      tray.style.display = 'flex';
+      tray.style.flexWrap = 'wrap';
+      tray.style.gap = '6px';
+      attachedFiles.forEach((f, idx) => {
+        const card = document.createElement('div');
+        card.className = 'image-preview-card';
+        if (f.kind === 'image') {
+          card.innerHTML = `
+            <img class="image-preview-thumb" src="${f.dataUrl}" alt="Önizleme">
+            <div class="image-preview-info">
+              <span class="image-preview-name">${esc(f.name)}</span>
+              <span class="image-preview-tag">Referans Görsel</span>
+            </div>`;
+        } else {
+          const sizeKb = Math.max(1, Math.round((f.content || '').length / 1024));
+          card.innerHTML = `
+            <div class="image-preview-thumb" style="display:flex;align-items:center;justify-content:center;font-size:16px;background:#1a2233;">📄</div>
+            <div class="image-preview-info">
+              <span class="image-preview-name">${esc(f.name)}</span>
+              <span class="image-preview-tag">Metin Dosyası · ${sizeKb} KB</span>
+            </div>`;
+        }
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'btn-remove-image';
+        del.textContent = '✕';
+        del.title = 'Eki Kaldır';
+        del.onclick = () => removeAttachedFile(idx);
+        card.appendChild(del);
+        tray.appendChild(card);
+      });
+    }
+
+    function removeAttachedFile(idx) {
+      attachedFiles.splice(idx, 1);
+      renderAttachedTray();
     }
 
     function removeAttachedImage() {
-      attachedImage = null;
-      const tray = document.getElementById('imagePreviewTray');
-      if (tray) tray.style.display = 'none';
+      attachedFiles = [];
+      renderAttachedTray();
       const input = document.getElementById('imageFileInput');
       if (input) input.value = '';
     }
@@ -2639,9 +2708,8 @@
       e.preventDefault();
       e.stopPropagation();
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files[0];
-        if (file.type.startsWith('image/')) {
-          processImageFile(file);
+        for (const file of e.dataTransfer.files) {
+          processSelectedFile(file);
         }
       }
     }, false);
@@ -2732,7 +2800,11 @@
       document.getElementById('welcomeScreen').classList.add('hidden');
       conversationHistory.forEach(msg => {
         if (msg.role === 'user') {
-          let html = msg.image ? `<img src="${msg.image.dataUrl || ''}" class="msg-attached-img" alt="Referans">` : '';
+          let html = '';
+          const imgs = (msg.files ? msg.files.filter(f => f.kind === 'image') : (msg.image ? [msg.image] : []));
+          imgs.forEach(im => { html += `<img src="${im.dataUrl || ''}" class="msg-attached-img" alt="Referans">`; });
+          const txts = (msg.files ? msg.files.filter(f => f.kind === 'text') : []);
+          txts.forEach(tf => { html += `<div style="font-size:12px;color:#38bdf8;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:6px;padding:4px 9px;margin-bottom:4px;">📄 ${esc(tf.name)}</div>`; });
           html += `<div>${esc(msg.text || '')}</div>`;
           addMsg('user', html);
         } else if (msg.role === 'assistant') {
@@ -2993,13 +3065,17 @@ CRITICAL ARCHITECTURAL RULES:
    - STRICT BAN: NEVER write "Nasıl Çalıştırılır?", "Scripts and Add-ins", "Alt+Shift+F", "My Scripts", "Create", "Run butonuna basın", or any instructions telling the user to copy/paste/execute code.
    - Simply explain the 3D design features and steps conversationally.
 
-2. PROJE ANLAMA VE SORU SORMA PRENSİBİ (WHEN TO ASK QUESTIONS):
-   - NE ZAMAN SORU SORULMALI:
-     * Kullanıcı genel, belirsiz veya fikir alma amaçlı bir taleple geldiğinde (örneğin "aklımda bir proje var", "uçak yapmak istiyorum ama nasıl yapsam?", "bir şey tasarlayalım"):
-       Projeyi tam olarak anlamak, fikir alışverişi yapmak ve projeyi sağlam bir temel üzerine inşa etmek için 1-2 kısa, net ve amaca yönelik soru sor (Örn: "Nasıl bir uçak tipi düşünüyorsun: Yolcu uçağı mı, savaş jeti mi, planör mü? Özel bir ölçü var mı yoksa standart ölçülerle ben mi başlayayım?").
-   - NE ZAMAN SORU SORULMAMALI (KESİNTİSİZ MODELLEME):
-     * Kullanıcı doğrudan "uçak yap", "4 ayaklı masa çiz", "drone modelle", "devam et", "sıradaki adımı yap", "sen karar ver ve başla" gibi net bir talimat verdiğinde ASLA durup retorik soru sorma ("şunu mu ekleyelim bunu mu?" gibi vakit kaybettirme)!
-     * Derhal tam donanımlı Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret ve modeli inşa et!
+2. PROJE ANLAMA, DETAYLI TASARIM ANALİZİ VE SORU SORMA PRENSİBİ (DESIGN BRIEF):
+   - HER YENİ TASARIM TALEBİNDE, kod yazmadan ÖNCE tasarımı en ince ayrıntısına kadar düşün ve yanıtının başında kısa bir TASARIM PLANI sun:
+     * Amaç / kullanım senaryosu (1-2 cümle)
+     * PARÇA LİSTESİ: her parça için isim, fonksiyon ve ana ölçüler (mm)
+     * Montaj / konumlandırma notları (hangi parça nereye ve hangi yüzeye oturuyor)
+   - EKSİK BİLGİ VARSA MUTLAKA SOR ("nasıl yapalım?" prensibi):
+     * Kritik ölçü, fonksiyon, malzeme veya montaj bilgisi gerçekten eksik ya da belirsizse: en fazla 3 adet NET soru sor ve her soruya makul bir varsayılan da öner (örn: "Masa kaç ayaklı olsun: 4 mü, yoksa ben standart 4 ayakla mı devam edeyim?").
+     * Bu sorular yanıtlanmadan kod üretme! Yanıt gelince TASARIM PLANI'nı güncelle ve modelle.
+   - NET TALİMAT + YETERLİ BİLGİ VARSA KESİNTİSİZ MODELLE:
+     * Kullanıcı doğrudan "uçak yap", "4 ayaklı masa çiz", "devam et", "sen karar ver" gibi net bir talimat verdiğinde ve gerekenler standart ölçülerle çıkarılabiliyorsa retorik soruyla vakit kaybetme!
+     * Yaptığın varsayımları TASARIM PLANI'nda kısaca belirt ve derhal tam donanımlı Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret!
 
 3. BİR İŞE BAŞLADIĞINDA O İŞİ BİTİRENE KADAR DEVAM ET (COMPLETE & ROBUST MODELING):
    - Bir tasarım talep edildiğinde, gereksiz yere yarım bırakıp durma!
@@ -3057,7 +3133,17 @@ CRITICAL ARCHITECTURAL RULES:
      Biçim: [ÖNERİLER: Öneri 1 | Öneri 2 | Öneri 3]
      Örnek (Uçak için): [ÖNERİLER: Jet motorlarını ekle | Kanat uçlarına winglet koy | Kokpit kanopisini detaylandır]
      Örnek (Masa için): [ÖNERİLER: Çekmece ekle | Kenarları yuvarlatılmış yap | Ayaklara destek çıtası koy]
-     Örnek (Soru sorma aşamasında): [ÖNERİLER: Standart ölçülerle başla | Ölçüleri ben vereyim | Sen karar ver ve modelle]`;
+     Örnek (Soru sorma aşamasında): [ÖNERİLER: Standart ölçülerle başla | Ölçüleri ben vereyim | Sen karar ver ve modelle]
+
+7. REFERANS GÖRSEL VE DOSYA EKLERİ (ATTACHMENTS):
+   - Kullanıcı bir GÖRSEL (el eskizi, teknik çizim, fotoğraf) eklediyse:
+     * Görseli detaylı analiz et: geometri, oranlar, görünür ölçüler ve notlar, bakış açısı.
+     * Anladığını kısaca özetle ("Görselde şunları görüyorum: ..."); kritik belirsizlik varsa 2. maddedeki "nasıl yapalım?" prensibiyle netleştir.
+     * Ardından görseldeki tasarıma SADIK kalarak (orantılar ve okunan ölçüler) modelle.
+   - Kullanıcı bir METİN/DOSYA eki ([EK DOSYA: isim] blokları — DXF, SVG, CSV, JSON, TXT vb.) gönderdiyse:
+     * İçeriği dikkatle oku: geometri komutları, koordinatlar, parametreler, ölçü tabloları.
+     * Dosyadan elde ettiklerini TASARIM PLANI'na işle; dosyada olmayan kritik bilgileri sor.
+     * Modeli bu veriler üzerine kur (örn. DXF koordinatlarını eskiz profiline, CSV ölçülerini parametrelere aktar).`;
 
     function cleanExplanationText(text) {
       if (!text) return '';
@@ -3137,6 +3223,12 @@ CRITICAL ARCHITECTURAL RULES:
       return '';
     }
 
+    function getTurnImages(turn) {
+      if (turn.files && turn.files.length > 0) return turn.files.filter(f => f.kind === 'image');
+      if (turn.image) return [turn.image];
+      return [];
+    }
+
     async function callLLM(provider, model, history, apiKey, healingInfo = null, baseUrl = null) {
       if (provider === 'google') {
         const contents = [];
@@ -3144,12 +3236,14 @@ CRITICAL ARCHITECTURAL RULES:
           const role = turn.role === 'assistant' ? 'model' : 'user';
           const parts = [];
           if (turn.text) parts.push({ text: turn.text });
-          if (turn.image && turn.role === 'user') {
-            parts.push({
-              inlineData: {
-                mimeType: turn.image.mimeType || 'image/png',
-                data: turn.image.base64
-              }
+          if (turn.role === 'user') {
+            getTurnImages(turn).forEach(img => {
+              parts.push({
+                inlineData: {
+                  mimeType: img.mimeType || 'image/png',
+                  data: img.base64
+                }
+              });
             });
           }
           if (parts.length > 0) contents.push({ role, parts });
@@ -3193,21 +3287,18 @@ CRITICAL ARCHITECTURAL RULES:
       } else if (provider === 'anthropic') {
         const messages = [];
         for (const turn of history) {
-          if (turn.image && turn.role === 'user') {
-            messages.push({
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: turn.image.mimeType || 'image/png',
-                    data: turn.image.base64
-                  }
-                },
-                { type: 'text', text: turn.text || 'Bu görseli referans alarak analiz et veya modelle.' }
-              ]
-            });
+          const turnImages = turn.role === 'user' ? getTurnImages(turn) : [];
+          if (turnImages.length > 0) {
+            const content = turnImages.map(img => ({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: img.mimeType || 'image/png',
+                data: img.base64
+              }
+            }));
+            content.push({ type: 'text', text: turn.text || 'Bu görselleri referans alarak analiz et veya modelle.' });
+            messages.push({ role: 'user', content });
           } else {
             messages.push({
               role: turn.role === 'assistant' ? 'assistant' : 'user',
@@ -3276,14 +3367,15 @@ CRITICAL ARCHITECTURAL RULES:
 
         const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
         for (const turn of history) {
-          if (turn.image && turn.role === 'user') {
-            messages.push({
-              role: 'user',
-              content: [
-                { type: 'text', text: turn.text || 'Bu görseli referans alarak analiz et veya modelle.' },
-                { type: 'image_url', image_url: { url: turn.image.dataUrl } }
-              ]
+          const turnImages = turn.role === 'user' ? getTurnImages(turn) : [];
+          if (turnImages.length > 0) {
+            const content = [
+              { type: 'text', text: turn.text || 'Bu görselleri referans alarak analiz et veya modelle.' }
+            ];
+            turnImages.forEach(img => {
+              content.push({ type: 'image_url', image_url: { url: img.dataUrl } });
             });
+            messages.push({ role: 'user', content });
           } else {
             messages.push({
               role: turn.role === 'assistant' ? 'assistant' : 'user',
@@ -3356,9 +3448,10 @@ CRITICAL ARCHITECTURAL RULES:
       if (state.isGenerating) return;
       const promptInput = document.getElementById('promptInput');
       const prompt = promptInput.value.trim();
-      const currentImage = attachedImage ? { ...attachedImage } : null;
+      const currentFiles = attachedFiles.splice(0).map(f => ({ ...f }));
+      const currentImages = currentFiles.filter(f => f.kind === 'image');
 
-      if (!prompt && !currentImage) return;
+      if (!prompt && currentFiles.length === 0) return;
 
       const isLocalMode = state.sourceMode === 'local';
       const activeProvider = isLocalMode ? 'local' : state.provider;
@@ -3383,15 +3476,18 @@ CRITICAL ARCHITECTURAL RULES:
         }
       }
 
-      // Render user message with attached image preview
+      // Render user message with attached files preview
       let userMsgHtml = '';
-      if (currentImage) {
-        userMsgHtml += `<img src="${currentImage.dataUrl}" class="msg-attached-img" alt="Referans Görsel">`;
-      }
+      currentImages.forEach(f => {
+        userMsgHtml += `<img src="${f.dataUrl}" class="msg-attached-img" alt="Referans Görsel">`;
+      });
+      currentFiles.filter(f => f.kind === 'text').forEach(f => {
+        userMsgHtml += `<div style="font-size:12px;color:#38bdf8;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:6px;padding:4px 9px;margin-bottom:4px;">📄 ${esc(f.name)}</div>`;
+      });
       if (prompt) {
         userMsgHtml += `<div>${esc(prompt)}</div>`;
-      } else {
-        userMsgHtml += `<div style="color:var(--text-2);font-style:italic;">Görsel referans olarak gönderildi.</div>`;
+      } else if (currentFiles.length > 0) {
+        userMsgHtml += `<div style="color:var(--text-2);font-style:italic;">Ekler referans olarak gönderildi.</div>`;
       }
       addMsg('user', userMsgHtml);
 
@@ -3406,7 +3502,10 @@ CRITICAL ARCHITECTURAL RULES:
 
       const isContinuation = /devam|sonraki|sıradak|ilerle|kaldığın|tamam|ekle|yap|bitir|ayrıntı|çiz|oluştur/i.test(prompt);
       const isComplaint = /tasarım yapmıyor|çizmiyor|model nerede|görünmüyor|eklenmedi|yapmıyor|çizmedi/i.test(prompt);
-      let effectivePrompt = prompt || 'Bu görseli referans alarak incele ve tasarım için yol göster veya modelle.';
+      let effectivePrompt = prompt || (currentImages.length > 0 ? 'Bu görseli referans alarak incele ve tasarım için yol göster veya modelle.' : 'Ekleri incele ve tasarım için yol göster veya modelle.');
+      currentFiles.filter(f => f.kind === 'text').forEach(f => {
+        effectivePrompt += `\n\n[EK DOSYA: ${f.name}]\n${f.content}\n[/EK DOSYA]`;
+      });
 
       if (designState && designState.has_design && designState.bodies_count > 0) {
         effectivePrompt = `${effectivePrompt}\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n${designState.summary_text}\n(Lütfen yeni eklenecek parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır, NewBodyFeatureOperation kullan ve gövdeleri kesmeye/birleştirmeye çalışma)`;
@@ -3424,7 +3523,7 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
       conversationHistory.push({
         role: 'user',
         text: effectivePrompt,
-        image: currentImage
+        files: currentFiles
       });
 
       // Clear input fields

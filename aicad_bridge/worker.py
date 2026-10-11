@@ -1,0 +1,175 @@
+"""Arka plan CAD üretim görevi: LLM çağrısı + Self-Healing döngüsü."""
+
+import re
+import traceback
+
+from aicad_bridge import events, messaging
+from aicad_bridge.llm.client import call_llm_api
+from aicad_bridge.llm.prompt import SYSTEM_PROMPT, extract_python_code
+from aicad_bridge.llm.registry import PROVIDERS
+from aicad_bridge.runtime import aicad_log
+
+
+def generate_cad_worker(data):
+    """Arka plan thread'inde LLM çağrısı ve Self-Healing CAD döngüsünü yürütür."""
+    provider = data.get('provider', 'ollama')
+    model = data.get('model', '')
+    prompt = data.get('prompt', '')
+    api_key = data.get('apiKey', '')
+    base_url = data.get('baseUrl') or data.get('base_url')
+    timeout = data.get('timeout', 90)
+    if provider == 'local':
+        timeout = max(timeout, 150)
+    aicad_log(f"generate_cad_worker başladı: provider={provider}, model={model}, baseUrl={base_url}, prompt='{prompt}'")
+
+    messages = [
+        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'user', 'content': prompt}
+    ]
+
+    # Mevcut Fusion 360 tasarımını kontrol et ve varsa bağlama ekle
+    try:
+        current_design = events.get_design_state_on_main_thread()
+        if current_design and current_design.get('has_design') and current_design.get('bodies_count', 0) > 0:
+            if '[MEVCUT FUSION 360 TASARIM DURUMU]' not in prompt:
+                design_summary = current_design.get('summary_text', '')
+                design_addon = (
+                    f"\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n{design_summary}\n"
+                    f"(Lütfen yeni parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır "
+                    f"ve kesinlikle FeatureOperations.NewBodyFeatureOperation kullan.)"
+                )
+                if re.search(r'devam|sonraki|sıradak|ilerle|kaldığın|tamam|ekle|yap|bitir|çiz|oluştur|model nerede|görünmüyor', prompt, re.I):
+                    design_addon += (
+                        "\n\n[KESİNTİSİZ ADIM ADIM MODELLEME TALİMATI]:\n"
+                        "Kullanıcı tasarıma devam etmeni ve Fusion 360 ekranında somut 3D parçayı hemen oluşturmanı istiyor! "
+                        "KESİNLİKLE soru sorma, 'şunu mu yapalım bunu mu' gibi seçenek sunup bekleme! "
+                        "Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı kendin belirleyerek "
+                        "DOĞRUDAN Fusion 360 Python kodunu ```python ... ``` bloğu içinde üret!\n"
+                        "ÖNEMLİ ZORUNLULUK: Kodun sonunda çizdiğin kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile "
+                        "mutlaka 3D katı gövdeye dönüştür! Sadece 2D eskiz çizip bırakma!"
+                    )
+                messages[1]['content'] += design_addon
+                aicad_log(f"generate_cad_worker: Tasarım durumu LLM bağlamına eklendi ({current_design.get('bodies_count')} gövde).")
+    except Exception as d_err:
+        aicad_log(f"generate_cad_worker tasarım durumu ekleme hatası: {d_err}")
+
+    prov_name = PROVIDERS.get(provider, {}).get('name', provider)
+
+    # 1. Deneme: Kod Üretimi
+    messaging.send_palette_message('statusUpdate', {
+        'status': 'loading',
+        'message': f'{prov_name} · {model} ile oluşturuluyor...'
+    })
+
+    try:
+        raw_reply = call_llm_api(provider, model, messages, api_key, timeout=timeout, base_url=base_url)
+        aicad_log(f"LLM yanıtı alındı (uzunluk: {len(raw_reply)})")
+    except Exception as e:
+        aicad_log(f"generate_cad_worker LLM çağrı hatası: {e}")
+        messaging.send_palette_message('taskResult', {
+            'status': 'error',
+            'message': str(e),
+            'error': traceback.format_exc(),
+        })
+        return
+
+    code = extract_python_code(raw_reply)
+    if not code:
+        aicad_log("Modelden doğrudan Python kodu gelmedi, sohbet/rehberlik yanıtı olarak iletiliyor.")
+        messaging.send_palette_message('taskResult', {
+            'status': 'chat',
+            'message': raw_reply,
+        })
+        return
+
+    # 1. Deneme: Fusion'da Çalıştırma
+    messaging.send_palette_message('statusUpdate', {
+        'status': 'loading',
+        'message': 'Fusion 360 içinde yürütülüyor...',
+    })
+
+    exec_res = events.run_code_on_main_thread(code)
+
+    if exec_res['success']:
+        new_b = exec_res.get('new_bodies', [])
+        b_info = f" ({', '.join(new_b)} eklendi)" if new_b else ""
+        messaging.send_palette_message('taskResult', {
+            'status': 'success',
+            'message': f'CAD Modeli başarıyla oluşturuldu!{b_info}',
+        })
+        return
+
+    # Multi-Attempt Self-Healing Loop: Hata Alındığında pes etmeden onarmaya devam et (3 Denemeye kadar)
+    current_code = code
+    current_exec_res = exec_res
+    healing_attempts = 0
+    max_healing_attempts = 3
+
+    while not current_exec_res.get('success') and healing_attempts < max_healing_attempts:
+        healing_attempts += 1
+        err_msg = current_exec_res.get('error', 'Bilinmeyen hata')
+        err_tb = current_exec_res.get('traceback', '')
+        aicad_log(f"{healing_attempts}. Onarım Denemesi başlatılıyor: {err_msg}")
+
+        messaging.send_palette_message('statusUpdate', {
+            'status': 'healing',
+            'message': f'Hata tespit edildi, onarılıyor... (Deneme {healing_attempts}/{max_healing_attempts})',
+        })
+
+        specific_tip = ""
+        if 'HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ' in err_msg or 'No bodies added' in err_msg:
+            specific_tip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili extrudes.add(extInput) ve NewBodyFeatureOperation ile 3D katı gövdeye dönüştür.\n"
+        elif 'Kesilecek veya kesişecek hedef gövde bulunamadı' in err_msg:
+            specific_tip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n"
+        elif 'profiles.item' in err_msg:
+            specific_tip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n"
+
+        healing_prompt = (
+            f"Fusion 360 API şu hatayı verdi ({healing_attempts}. deneme):\n{err_msg}\n\n"
+            f"Detaylı Traceback:\n{err_tb}\n\n"
+            f"{specific_tip}"
+            f"Lütfen çizimi, düzlemi veya parametreleri düzelterek kodu yeniden ver. "
+            f"Sadece ```python ... ``` bloğu içinde saf ve hatasız Fusion 360 Python kodu döndür."
+        )
+
+        messages_attempt = [
+            {'role': 'system', 'content': SYSTEM_PROMPT},
+            {'role': 'user', 'content': prompt},
+            {'role': 'assistant', 'content': f"```python\n{current_code}\n```"},
+            {'role': 'user', 'content': healing_prompt}
+        ]
+
+        try:
+            raw_reply_h = call_llm_api(provider, model, messages_attempt, api_key, timeout=timeout, base_url=base_url)
+            code_h = extract_python_code(raw_reply_h)
+        except Exception as e:
+            aicad_log(f"Self-Healing LLM hatası: {e}")
+            break
+
+        if not code_h:
+            aicad_log(f"Self-Healing: Model geçerli kod üretemedi (Deneme {healing_attempts})")
+            break
+
+        current_code = code_h
+
+        messaging.send_palette_message('statusUpdate', {
+            'status': 'loading',
+            'message': f'Düzeltilen kod yürütülüyor ({healing_attempts}/{max_healing_attempts})...',
+        })
+
+        current_exec_res = events.run_code_on_main_thread(current_code)
+        if current_exec_res.get('success'):
+            break
+
+    if current_exec_res.get('success'):
+        new_b = current_exec_res.get('new_bodies', [])
+        b_info = f" ({', '.join(new_b)} eklendi)" if new_b else ""
+        messaging.send_palette_message('taskResult', {
+            'status': 'success',
+            'message': f'CAD Modeli onarılarak başarıyla oluşturuldu!{b_info}',
+        })
+    else:
+        messaging.send_palette_message('taskResult', {
+            'status': 'error',
+            'message': f"Onarım tamamlanamadı: {current_exec_res.get('error', 'Bilinmeyen hata')}",
+        })
