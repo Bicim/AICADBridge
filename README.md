@@ -72,9 +72,12 @@ AICADBridge/
 ├── AICADBridge.py              # Ana eklenti dosyası (backend)
 ├── AICADBridge.manifest        # Fusion 360 eklenti tanımlayıcısı
 ├── index.html                  # Dark Neon kullanıcı arayüzü
+├── .env.example                # Yapılandırma örneği (model ayarları, max_tokens)
 ├── config.py                   # Port ve genel yapılandırmalar
+├── aicad_bridge/config.py      # .env okuyucu: planner/coder model + max_tokens ayarları
 ├── inspect_state.py            # Fusion 360 durum okuyucu
 ├── AddInIcon.svg               # Eklenti ikonu
+├── docs/                       # Dokümantasyon (test komutları vb.)
 ├── commands/                   # Komut modülleri
 ├── lib/                        # Harici kütüphaneler
 └── resources/                  # Ikon ve kaynak dosyaları
@@ -102,12 +105,34 @@ AICADBridge/
    macOS:   ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/
    `
 
-3. **API anahtarlarınızı yapılandırın** (.env dosyasını düzenleyin):
+3. **API anahtarlarınızı ve model ayarlarınızı yapılandırın:**
+
+   Repodaki `.env.example` dosyasını `.env` olarak kopyalayın ve düzenleyin:
+
+   ``
+   cp .env.example .env
+   ``
+
+   Model adlarını koda gömmek yerine `.env` üzerinden yönetin. **Model adları sağlayıcıya göre sık değişir; kendi sağlayıcınızın güncel model adını sağlayıcının konsolundan kopyalayıp girin.** Örnek:
+
    `env
+   # Üretim hattı (İki Aşamalı: Planner -> Coder) — boş bırakılırsa sohbet modeli kullanılır
+   AICAD_PLANNER_PROVIDER=openai
+   AICAD_PLANNER_MODEL=kendi_saglayicinin_guncel_model_adi
+   AICAD_CODER_PROVIDER=anthropic
+   AICAD_CODER_MODEL=kendi_saglayicinin_guncel_model_adi
+
+   # Yanıt uzunluğu sınırları (varsayılanlar: 16384 / 4096)
+   AICAD_MAX_TOKENS=16384
+   AICAD_VISION_MAX_TOKENS=4096
+
+   # API anahtarları (isteğe bağlı; UI kendi anahtarlarını tarayıcıda saklar)
    ANTHROPIC_API_KEY=your_claude_key
    OPENAI_API_KEY=your_openai_key
    GOOGLE_API_KEY=your_gemini_key
-   `
+   ``
+
+   Aynı ayarlar Fusion 360 içindeki **⚙️ Ayarlar → 🏭 Üretim Hattı (Planner & Coder)** bölümünden de yapılabilir (UI seçimi `.env` varsayılanını geçersiz kılar).
 
 4. **Fusion 360'ta etkinleştirin:**
    Tools → Add-Ins → Scripts and Add-Ins → AICADBridge → Run
@@ -124,17 +149,23 @@ TR: "Flanş modeline 4 adet eşit aralıklı M6 cıvata deliği aç"
 EN: "Add 4 equally spaced M6 bolt holes to the flange model"
 `
 
+> 🧪 Basitten karmaşığa **10 doğrulanmış test komutu** (beklenen sonuçlar, ölçü/delik/fillet kontrol noktaları ve regression notlarıyla): **[docs/test_prompts.md](docs/test_prompts.md)**
+
 ---
 
 ## 🤖 Desteklenen AI Modeller / Supported AI Models
 
-| Provider | Modeller |
-|----------|---------|
-| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Opus |
-| **OpenAI** | GPT-4o, GPT-4 Turbo |
-| **Google** | Gemini 1.5 Pro, Gemini 2.0 Flash |
-| **DeepSeek** | DeepSeek Coder V2 |
-| **Ollama** | Llama 3, CodeLlama, Mistral (lokal) |
+Aşağıdaki sağlayıcılar desteklenir; **model adları koda gömülmez** — arayüzdeki "Modelleri Listele" ile sağlayıcınızdan güncel listeyi çekin veya model adını elle girin:
+
+| Provider | Model Seçimi |
+|----------|--------------|
+| **Anthropic** | API'den çekilir (CORS engeli varsa: `.env` → `AICAD_ANTHROPIC_MODELS` ile liste tanımlayın veya adı elle girin) |
+| **OpenAI** | API'den çekilir ("Modelleri Listele") |
+| **Google** | API'den çekilir ("Modelleri Listele") |
+| **Groq / OpenRouter / DeepSeek** | API'den çekilir ("Modelleri Listele") |
+| **Ollama / LM Studio / llama.cpp** | Yerel sunucudan otomatik taranır |
+
+> 💡 **Önemli:** Model adları sağlayıcılar tarafından sık değiştirilir. Liste gelmezse **kendi sağlayıcınızın güncel model adını** sağlayıcının konsolundan kopyalayıp arayüzdeki model alanına girin. Planner ve Coder aşamaları için ayrı model seçmek üzere `.env` içindeki `AICAD_PLANNER_MODEL` / `AICAD_CODER_MODEL` anahtarlarını veya Ayarlar → 🏭 Üretim Hattı bölümünü kullanın.
 
 ---
 
