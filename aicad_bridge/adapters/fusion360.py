@@ -1,6 +1,8 @@
 """Fusion 360 CAD adapterı: tasarım durumu okuma ve kod yürütme."""
 
+import ast
 import math
+import os
 import traceback
 
 import adsk.core
@@ -72,11 +74,29 @@ def inspect_current_design():
 
                 vol_cm3 = round(body.volume, 2) if hasattr(body, 'volume') else 0.0
 
+                # Yüz/kenar sayıları ve silindirik yüz sayısı (delik doğrulaması için)
+                faces_count = 0
+                edges_count = 0
+                cylinder_faces_count = 0
+                if hasattr(body, 'faces'):
+                    faces_count = body.faces.count
+                    for fi in range(body.faces.count):
+                        try:
+                            face_geom = body.faces.item(fi).geometry
+                            if face_geom and face_geom.objectType == adsk.core.Cylinder.classType():
+                                cylinder_faces_count += 1
+                        except Exception:
+                            pass
+                if hasattr(body, 'edges'):
+                    edges_count = body.edges.count
+
                 bodies.append({
                     'name': body.name,
                     'is_solid': body.isSolid,
                     'is_visible': body.isVisible,
-                    'faces_count': body.faces.count if hasattr(body, 'faces') else 0,
+                    'faces_count': faces_count,
+                    'edges_count': edges_count,
+                    'cylinder_faces_count': cylinder_faces_count,
                     'volume_cm3': vol_cm3,
                     'bounds_mm': {
                         'min': [min_x_mm, min_y_mm, min_z_mm],
@@ -120,6 +140,12 @@ def inspect_current_design():
 
         summary_text = "\n".join(summary_lines)
 
+        # Toplam metrikler (iki aşamalı hattın geometrik doğrulaması için)
+        total_faces = sum(int(b.get('faces_count', 0) or 0) for b in bodies)
+        total_edges = sum(int(b.get('edges_count', 0) or 0) for b in bodies)
+        total_cylinder_faces = sum(int(b.get('cylinder_faces_count', 0) or 0) for b in bodies)
+        total_volume_cm3 = round(sum(float(b.get('volume_cm3', 0.0) or 0.0) for b in bodies), 2)
+
         return {
             'has_design': True,
             'doc_name': doc.name,
@@ -128,6 +154,10 @@ def inspect_current_design():
             'bodies': bodies,
             'sketches_count': len(sketches),
             'sketches': sketches,
+            'total_faces': total_faces,
+            'total_edges': total_edges,
+            'total_cylinder_faces': total_cylinder_faces,
+            'total_volume_cm3': total_volume_cm3,
             'summary_text': summary_text
         }
     except Exception as e:
@@ -159,6 +189,18 @@ def execute_code(code):
 
         aicad_log(f"Kod çalıştırılıyor. rootComp={'Var' if root_comp else 'Yok'}, mevcut gövdeler={initial_bodies}")
         aicad_log(f"--- [İCRA EDİLECEK KOD BAŞLANGICI] ---\n{code}\n--- [İCRA EDİLECEK KOD BİTİŞİ] ---")
+
+        # Sözdizimi ön kontrolü: kodu çalıştırmadan önce ast.parse ile doğrula.
+        # Böylece hatalı kod exec'e hiç girmez ve Self-Healing sistemine temiz bir
+        # hata mesajı iletilir (satır numarasıyla).
+        try:
+            ast.parse(code)
+        except SyntaxError as syn_err:
+            err_msg = (f"Üretilen kodda SÖZDİZİMİ HATASI var (satır {syn_err.lineno}): {syn_err.msg}. "
+                       f"Kod Fusion 360 içinde ÇALIŞTIRILMADI; lütfen Python sözdizimini düzeltin.")
+            aicad_log(f"Sözdizimi ön kontrolü hatası: satır {syn_err.lineno}: {syn_err.msg}")
+            return {'success': False, 'error': err_msg,
+                    'traceback': f'SyntaxError: {syn_err.msg} (satır {syn_err.lineno})'}
 
         safe_ui = SafeUIWrapper(ui)
         exec_scope = {
@@ -228,3 +270,36 @@ def execute_code(code):
         tb = traceback.format_exc()
         aicad_log(f"Kod çalıştırma hatası: {str(e)}\n{tb}")
         return {'success': False, 'error': str(e), 'traceback': tb}
+
+
+def capture_viewport_image(width=900, height=600):
+    """Aktif viewport'un ekran görüntüsünü base64 data URL olarak döndürür.
+
+    Vision destekli sağlayıcılarda "model komuta uyuyor mu" görsel doğrulaması
+    için kullanılır. Fusion ana thread'inden çağrılmalıdır.
+    """
+    import base64
+    import tempfile
+    try:
+        if not runtime.app:
+            runtime.app = adsk.core.Application.get()
+        viewport = runtime.app.activeViewport
+        if not viewport:
+            return {'success': False, 'error': 'Aktif viewport bulunamadı.'}
+
+        fd, path = tempfile.mkstemp(suffix='.png')
+        os.close(fd)
+        try:
+            viewport.saveAsImageFile(path, width, height)
+            with open(path, 'rb') as img_file:
+                b64 = base64.b64encode(img_file.read()).decode('ascii')
+            return {'success': True, 'image': 'data:image/png;base64,' + b64}
+        finally:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+    except Exception as e:
+        tb = traceback.format_exc()
+        aicad_log(f"capture_viewport_image hatası: {e}\n{tb}")
+        return {'success': False, 'error': str(e)}

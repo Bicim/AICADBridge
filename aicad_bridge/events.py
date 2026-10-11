@@ -35,7 +35,7 @@ def get_design_state_on_main_thread():
 
 
 def run_code_on_main_thread(code):
-    """Fusion ana thread'inde Python kodunu çalıştırır ve sonucu bekler."""
+    """Fusion ana thread'inde Python kodunu çalıştırır ve sonucunu bekler."""
     task_id = str(time.time())
     evt = threading.Event()
     task = {'event': evt, 'result': None}
@@ -51,6 +51,27 @@ def run_code_on_main_thread(code):
 
     if not completed or not task_data or not task_data.get('result'):
         return {'success': False, 'error': 'İşlem zaman aşımına uğradı (45 saniye).', 'traceback': ''}
+    return task_data['result']
+
+
+def capture_viewport_on_main_thread(width=900, height=600):
+    """Fusion ana thread'inde viewport ekran görüntüsü alıp sonucunu bekler."""
+    if not runtime.app or not runtime.custom_event:
+        return fusion360.capture_viewport_image(width, height)
+    task_id = str(time.time())
+    evt = threading.Event()
+    with runtime.task_lock:
+        runtime.pending_tasks[task_id] = {'event': evt, 'result': None}
+
+    payload = {'action': 'capture_viewport', 'task_id': task_id, 'width': width, 'height': height}
+    runtime.app.fireCustomEvent(CUSTOM_EVENT_ID, json.dumps(payload))
+
+    completed = evt.wait(timeout=15.0)
+    with runtime.task_lock:
+        task_data = runtime.pending_tasks.pop(task_id, None)
+
+    if not completed or not task_data or not task_data.get('result'):
+        return {'success': False, 'error': 'Viewport görüntüsü alınamadı (zaman aşımı).'}
     return task_data['result']
 
 
@@ -85,6 +106,14 @@ class CustomEventHandler(adsk.core.CustomEventHandler):
             elif act == 'get_design_state':
                 task_id = payload.get('task_id')
                 res = fusion360.inspect_current_design()
+                with runtime.task_lock:
+                    if task_id in runtime.pending_tasks:
+                        runtime.pending_tasks[task_id]['result'] = res
+                        runtime.pending_tasks[task_id]['event'].set()
+
+            elif act == 'capture_viewport':
+                task_id = payload.get('task_id')
+                res = fusion360.capture_viewport_image(payload.get('width', 900), payload.get('height', 600))
                 with runtime.task_lock:
                     if task_id in runtime.pending_tasks:
                         runtime.pending_tasks[task_id]['result'] = res

@@ -89,10 +89,20 @@ CRITICAL ARCHITECTURAL RULES:
      * Görseli detaylı analiz et: geometri, oranlar, görünür ölçüler ve notlar, bakış açısı.
      * Anladığını kısaca özetle ("Görselde şunları görüyorum: ..."); kritik belirsizlik varsa 2. maddedeki "nasıl yapalım?" prensibiyle netleştir.
      * Ardından görseldeki tasarıma SADIK kalarak (orantılar ve okunan ölçüler) modelle.
-   - Kullanıcı bir METİN/DOSYA eki ([EK DOSYA: isim] blokları — DXF, SVG, CSV, JSON, TXT vb.) gönderdiyse:
-     * İçeriği dikkatle oku: geometri komutları, koordinatlar, parametreler, ölçü tabloları.
-     * Dosyadan elde ettiklerini TASARIM PLANI'na işle; dosyada olmayan kritik bilgileri sor.
-     * Modeli bu veriler üzerine kur (örn. DXF koordinatlarını eskiz profiline, CSV ölçülerini parametrelere aktar).
+    - Kullanıcı bir METİN/DOSYA eki ([EK DOSYA: isim] blokları — DXF, SVG, CSV, JSON, TXT vb.) gönderdiyse:
+      * İçeriği dikkatle oku: geometri komutları, koordinatlar, parametreler, ölçü tabloları.
+      * Dosyadan elde ettiklerini TASARIM PLANI'na işle; dosyada olmayan kritik bilgileri sor.
+      * Modeli bu veriler üzerine kur (örn. DXF koordinatlarını eskiz profiline, CSV ölçülerini parametrelere aktar).
+
+8. PARAMETRİK VE GERÇEK ÖZELLİK KULLANIMI (PARAMETRIC & NATIVE FEATURES):
+   - Önemli ölçüleri kod içinde sabit sayı olarak YAZMA; USER PARAMETER olarak tanımla ve kullan:
+     params = design.userParameters
+     p = params.add('genislik_mm', adsk.core.ValueInput.createByString('50 mm'), 'mm', 'Açıklama')
+   - Mümkünse elle kesit çizip kesmek yerine GERÇEK Fusion özelliklerini kullan:
+     delikler için holeFeatures, kenar yuvarlatma için filletFeatures, pah için chamferFeatures.
+   - FEATURE SIRASI mantıklı olsun: önce ana gövdeler (extrude/revolve/sweep/loft),
+     sonra delik ve kesmeler (hole/cut), en son yüzey işlemleri (fillet/chamfer)
+     ve çoğaltmalar (pattern/mirror).
 """
 
 
