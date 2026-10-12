@@ -30,6 +30,16 @@
 - 🤖 **Çoklu AI Desteği**: Claude, GPT-4o, Gemini, DeepSeek, Ollama/LM Studio
 - 🌑 **Dark Neon UI**: Modern karanlık temalı kullanıcı arayüzü
 
+### 📸 Uygulamadan Görünümler / Screenshots
+
+| İki Aşamalı Üretim Hattı (Planner → Coder) | Parametrik Sliderlar |
+|:---:|:---:|
+| ![İki aşamalı üretim hattı: plan adım listesi, geometrik doğrulama ve görsel kontrol satırları](docs/images/app_pipeline.png) | ![Parametrik modelleme: canlı slider paneli](docs/images/app_parametric.png) |
+
+*Solda: plan adım listesi (⏳/✅ durumlu), 🔍 geometrik doğrulama ve 👁️ görsel kontrol satırları. Sağda: parametrik modelleme panelinde canlı slider kontrolü.*
+
+![AI CAD Studio karşılama ekranı](docs/images/app_welcome.png)
+
 ---
 
 ## 🏗️ Mimari / Architecture
@@ -77,7 +87,7 @@ AICADBridge/
 ├── aicad_bridge/config.py      # .env okuyucu: planner/coder model + max_tokens ayarları
 ├── inspect_state.py            # Fusion 360 durum okuyucu
 ├── AddInIcon.svg               # Eklenti ikonu
-├── docs/                       # Dokümantasyon (test komutları vb.)
+├── docs/                       # Dokümantasyon (test komutları) ve ekran görüntüleri (docs/images/)
 ├── commands/                   # Komut modülleri
 ├── lib/                        # Harici kütüphaneler
 └── resources/                  # Ikon ve kaynak dosyaları
@@ -92,50 +102,76 @@ AICADBridge/
 - Autodesk Fusion 360 (güncel sürüm)
 - En az bir AI API anahtarı (Claude, OpenAI, Gemini) veya lokal Ollama
 
-### Adımlar / Steps
+### Adımlar / Steps — Görselli Kurulum Rehberi
 
-1. **Repoyu klonlayın:**
-   `ash
-   git clone https://github.com/yunusayyldz/AICADBridge.git
-   `
+#### 1️⃣ GitHub'dan projeyi indirin
 
-2. **Fusion 360 AddIns klasörüne taşıyın:**
-   `
-   Windows: %APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\
-   macOS:   ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/
-   `
+Tarayıcıyla repo sayfasını açın: **https://github.com/yunusayyldz/AICADBridge**
+Yeşil **`<> Code`** butonuna tıklayıp klonlama URL'sini kopyalayın (veya **Download ZIP** ile doğrudan indirin):
 
-3. **API anahtarlarınızı ve model ayarlarınızı yapılandırın:**
+<img src="docs/images/github_repo.png" width="720" alt="GitHub repo sayfası: Code butonu ve klonlama URL'si" />
 
-   Repodaki `.env.example` dosyasını `.env` olarak kopyalayın ve düzenleyin:
+Ardından terminalde klonlayın:
 
-   ``
-   cp .env.example .env
-   ``
+```bash
+git clone https://github.com/yunusayyldz/AICADBridge.git
+```
 
-   Model adlarını koda gömmek yerine `.env` üzerinden yönetin. **Model adları sağlayıcıya göre sık değişir; kendi sağlayıcınızın güncel model adını sağlayıcının konsolundan kopyalayıp girin.** Örnek:
+#### 2️⃣ Fusion 360 AddIns klasörüne taşıyın
 
-   `env
-   # Üretim hattı (İki Aşamalı: Planner -> Coder) — boş bırakılırsa sohbet modeli kullanılır
-   AICAD_PLANNER_PROVIDER=openai
-   AICAD_PLANNER_MODEL=kendi_saglayicinin_guncel_model_adi
-   AICAD_CODER_PROVIDER=anthropic
-   AICAD_CODER_MODEL=kendi_saglayicinin_guncel_model_adi
+Klonlanan `AICADBridge` klasörünü Fusion 360'ın eklenti dizinine kopyalayın:
 
-   # Yanıt uzunluğu sınırları (varsayılanlar: 16384 / 4096)
-   AICAD_MAX_TOKENS=16384
-   AICAD_VISION_MAX_TOKENS=4096
+```
+Windows: %APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\
+macOS:   ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/
+```
 
-   # API anahtarları (isteğe bağlı; UI kendi anahtarlarını tarayıcıda saklar)
-   ANTHROPIC_API_KEY=your_claude_key
-   OPENAI_API_KEY=your_openai_key
-   GOOGLE_API_KEY=your_gemini_key
-   ``
+> 💡 İpucu: Windows'ta Dosya Gezgini adres çubuğuna `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\` yazıp Enter'a basarak klasörü doğrudan açabilirsiniz.
 
-   Aynı ayarlar Fusion 360 içindeki **⚙️ Ayarlar → 🏭 Üretim Hattı (Planner & Coder)** bölümünden de yapılabilir (UI seçimi `.env` varsayılanını geçersiz kılar).
+#### 3️⃣ API anahtarlarınızı ve model ayarlarınızı yapılandırın
 
-4. **Fusion 360'ta etkinleştirin:**
-   Tools → Add-Ins → Scripts and Add-Ins → AICADBridge → Run
+Repodaki `.env.example` dosyasını `.env` olarak kopyalayın ve düzenleyin:
+
+```bash
+cp .env.example .env
+```
+
+Model adlarını koda gömmek yerine `.env` üzerinden yönetin. **Model adları sağlayıcıya göre sık değişir; kendi sağlayıcınızın güncel model adını sağlayıcının konsolundan kopyalayıp girin.** Örnek:
+
+```env
+# Üretim hattı (İki Aşamalı: Planner -> Coder) — boş bırakılırsa sohbet modeli kullanılır
+AICAD_PLANNER_PROVIDER=openai
+AICAD_PLANNER_MODEL=kendi_saglayicinin_guncel_model_adi
+AICAD_CODER_PROVIDER=anthropic
+AICAD_CODER_MODEL=kendi_saglayicinin_guncel_model_adi
+
+# Yanıt uzunluğu sınırları (varsayılanlar: 16384 / 4096)
+AICAD_MAX_TOKENS=16384
+AICAD_VISION_MAX_TOKENS=4096
+
+# API anahtarları (isteğe bağlı; UI kendi anahtarlarını tarayıcıda saklar)
+ANTHROPIC_API_KEY=your_claude_key
+OPENAI_API_KEY=your_openai_key
+GOOGLE_API_KEY=your_gemini_key
+```
+
+Aynı ayarlar Fusion 360 içindeki **⚙️ Ayarlar → 🏭 Üretim Hattı (Planner & Coder)** bölümünden de yapılabilir (UI seçimi `.env` varsayılanını geçersiz kılar).
+
+#### 4️⃣ Fusion 360'ta etkinleştirin
+
+Fusion 360 içinde **Tools → Add-Ins → Scripts and Add-Ins** penceresini açın, **Add-Ins** sekmesinde (klasör simgesi) **AICADBridge**'i seçin ve **Run**'a basın.
+
+Eklenti çalıştığında sağ tarafta **AI CAD Studio** paleti açılır. Harici tarayıcı modunda `index.html`'i tarayıcıda açtığınızda da aynı arayüz karşınıza çıkar:
+
+<img src="docs/images/app_welcome.png" width="380" alt="AI CAD Studio karşılama ekranı — Dark Neon arayüz" />
+
+#### 5️⃣ AI sağlayıcınızı bağlayın
+
+⚙️ **Ayarlar** → bir sağlayıcı seçin → **API anahtarınızı** girin → **Bağlan** → **Modelleri Listele** ile güncel modelinizi seçin. Planner ve Coder aşamaları için ayrı modeller belirlemek isterseniz **🏭 Üretim Hattı (Planner & Coder)** bölümünü kullanın:
+
+<img src="docs/images/app_settings.png" width="380" alt="Ayarlar paneli: sağlayıcı listesi ve Üretim Hattı (Planner & Coder) model seçimi" />
+
+> ✅ **Hazır!** Artık doğal dille modelleme yapabilirsiniz — örnekler için aşağıdaki **Örnek Komutlar** bölümüne ve [docs/test_prompts.md](docs/test_prompts.md) kılavuzuna bakın.
 
 ---
 
