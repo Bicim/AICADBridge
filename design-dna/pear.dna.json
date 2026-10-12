@@ -1,0 +1,152 @@
+{
+  "meta": {
+    "name": "pear.no — Identity & Partnership Editorial",
+    "description": "Editorial one-page identity playbook of a revenue-share SEO/software studio. Open, warm-white ground; restrained serif typography with italic emphasis; chaptered single page; honest 'full disclosure' notes. Used as the TONE/RHYTHM reference, never as pixel copy.",
+    "source_references": ["https://pear.no/"],
+    "created_at": "2026-10-11"
+  },
+  "design_system": {
+    "color": {
+      "palette_type": "monochromatic",
+      "primary": { "hex": "#141414", "role": "ink / primary text on light ground" },
+      "secondary": { "hex": "#5d5a54", "role": "muted editorial text" },
+      "accent": { "hex": "#c9883e", "role": "single warm metallic accent (links / small labels)" },
+      "neutral": { "scale": ["#ffffff", "#faf9f7", "#f2f0eb", "#e5e2db", "#141414"], "usage": "warm off-white ground with near-black ink; gray muted body" },
+      "semantic": { "success": "#2e7d5b", "warning": "#b8860b", "error": "#a3352f", "info": "#c9883e" },
+      "surface": { "background": "#faf9f7", "card": "#ffffff", "elevated": "#ffffff" },
+      "contrast_strategy": "dark-on-light dominant; high contrast ink on warm white; muted text only for secondary editorial copy",
+      "measurement": { "source": "pear.no", "method": "manual token extraction", "k": 3 }
+    },
+    "typography": {
+      "type_scale": {
+        "display":   { "size": "clamp(52px,10vw,112px)", "weight": "420", "line_height": "0.98", "tracking": "-0.03em" },
+        "heading_1": { "size": "clamp(34px,5.5vw,64px)", "weight": "420", "line_height": "1.04", "tracking": "-0.02em" },
+        "heading_2": { "size": "clamp(26px,3.5vw,42px)", "weight": "420", "line_height": "1.1", "tracking": "-0.015em" },
+        "heading_3": { "size": "clamp(20px,2.2vw,28px)", "weight": "480", "line_height": "1.2", "tracking": "-0.01em" },
+        "body":      { "size": "clamp(16px,1vw,19px)", "weight": "400", "line_height": "1.55", "tracking": "0em" },
+        "body_small":{ "size": "15px", "weight": "400", "line_height": "1.5", "tracking": "0em" },
+        "caption":   { "size": "13px", "weight": "400", "line_height": "1.4", "tracking": "0.02em" },
+        "overline":  { "size": "12px", "weight": "600", "line_height": "1.3", "tracking": "0.12em" }
+      },
+      "font_families": { "heading": "editorial serif with strong italic cut (display)", "body": "neutral humanist sans", "mono": "system monospace" },
+      "font_style_notes": "Half-normal / half-italic headlines: one clause regular, the counter-clause italic serif. Generous paragraph width (45-75ch). Italic is a semantic device, not decoration."
+    },
+    "spacing": {
+      "base_unit": 8,
+      "scale": [4, 8, 16, 24, 40, 64, 96, 160],
+      "content_density": "spacious",
+      "section_rhythm": "alternating restraint — long quiet sections interrupted by a single loud statement; vertical padding varies chapter to chapter"
+    },
+    "layout": {
+      "grid_system": "single centred column + full-bleed chapter breaks",
+      "max_content_width": "720px (text), 1280px (full-bleed)",
+      "columns": 1,
+      "gutter": "clamp(20px,5vw,64px)",
+      "breakpoints": [480, 768, 1080],
+      "alignment_tendency": "mixed — centred hero, left-aligned editorial body, asymmetric metadata rows"
+    },
+    "shape": {
+      "border_radius": { "small": "4px", "medium": "8px", "large": "12px", "pill": "999px" },
+      "border_usage": "none on surfaces; hairline 1px only on form controls and metadata dividers",
+      "divider_style": "thin hairline in warm gray between editorial chapters"
+    },
+    "elevation": {
+      "shadow_style": "none (flat editorial)",
+      "levels": { "low": "0 1px 2px rgba(20,20,20,0.04)", "medium": "none", "high": "none" },
+      "depth_cues": "color intensity and scale contrast, not shadows"
+    },
+    "iconography": {
+      "style": "minimal line icons, restrained",
+      "stroke_weight": 1.5,
+      "size_scale": [16, 20, 24],
+      "preferred_set": "custom minimal line"
+    },
+    "motion": {
+      "easing": "ease-out cubic (slow deceleration)",
+      "duration_scale": { "micro": "180ms", "normal": "400ms", "macro": "1200ms" },
+      "entrance_pattern": "content-driven; elements settle with slight upward release",
+      "exit_pattern": "immediate content crossfade between chapters",
+      "philosophy": "editorial — motion serves reading rhythm, never spectacle"
+    },
+    "components": {
+      "button_style": "text-link CTA (underlined on hover) with single arrow suffix; one primary pill button allowed",
+      "input_style": "underline-only inputs",
+      "card_style": "borderless, whitespace-defined",
+      "navigation_pattern": "fixed 4-item anchor nav (generation number + label), no hamburger under 768px unless needed",
+      "modal_style": "full-screen dim block, centred single question",
+      "list_style": "numberless editorial bullets, asymmetric",
+      "component_notes": "Every claim is followed by an inline 'Full disclosure' note block — honesty is a UI component, not a footnote."
+    }
+  },
+  "design_style": {
+    "aesthetic": {
+      "mood": ["calm", "confident", "warm minimal", "editorial", "quietly premium"],
+      "visual_metaphor": "a well-set printed chapter with one live seam",
+      "era_influence": "Swiss editorial / mid-century print",
+      "genre": "identity playbook / product essay",
+      "personality_traits": ["honest", "precise", "confident without shouting", "human"],
+      "adjectives": ["restrained", "literate", "architectural", "approachable"]
+    },
+    "visual_language": {
+      "complexity": "minimal",
+      "ornamentation": "none — italic serif is the only ornament",
+      "whitespace_usage": "generous and load-bearing (whitespace is the grid)",
+      "visual_weight_distribution": "single heavy headline + large quiet planes",
+      "focal_strategy": "single hero statement; then progressive calm reveal",
+      "contrast_level": "high tonal contrast, low chromatic contrast",
+      "texture_usage": "none (flat grounds)"
+    },
+    "composition": {
+      "hierarchy_method": "typographic hierarchy via size and italic contrast",
+      "balance_type": "asymmetric editorial balance",
+      "flow_direction": "top-down vertical, one idea per viewport",
+      "grouping_strategy": "white-space grouping (no boxes)",
+      "negative_space_role": "primary composition device"
+    },
+    "imagery": {
+      "photo_treatment": "none required (typographic identity)",
+      "illustration_style": "none (prohibited to copy pear art)",
+      "graphic_elements": "hairlines, footnotes, minimal arrows",
+      "pattern_usage": "none",
+      "image_shape": "n/a"
+    },
+    "interaction_feel": {
+      "feedback_style": "quiet and immediate (link underline, dot state changes)",
+      "hover_behavior": "underline / single color shift",
+      "transition_personality": "slow ease, editorial settle",
+      "loading_style": "no spinners; content reveals as it loads",
+      "microinteraction_density": "low — value the stillness"
+    },
+    "brand_voice_in_ui": {
+      "tone": "direct, plain-spoken, no superlatives",
+      "formality": "formal-adjacent with human warmth",
+      "cta_style": "direct imperative ('Send the application')",
+      "empty_state_approach": "candid statement of what is and is not offered",
+      "error_tone": "honest, names the trade-off"
+    }
+  },
+  "visual_effects": {
+    "overview": {
+      "effect_intensity": "none (scroll-driven editorial)",
+      "performance_tier": "lightweight",
+      "fallback_strategy": "static editorial at all breakpoints",
+      "primary_technology": "CSS only"
+    },
+    "background_effects": { "type": "none", "description": "flat warm-white grounds", "technology": "CSS", "params": {} },
+    "particle_systems": { "enabled": false, "type": "none", "description": "", "technology": "", "params": {} },
+    "3d_elements": { "enabled": false, "type": "none", "description": "", "technology": "", "params": {} },
+    "shader_effects": { "enabled": false, "type": "none", "description": "", "technology": "", "params": {} },
+    "scroll_effects": {
+      "parallax": { "enabled": false, "layers": "0", "depth_range": "0", "speed_curve": "none" },
+      "scroll_triggered_animations": { "enabled": true, "trigger_points": ["chapter boundaries"], "animation_type": "fade-up / release", "scrub_behavior": "CSS visibility timeline" },
+      "scroll_morphing": { "enabled": false, "description": "" }
+    },
+    "text_effects": { "type": "split-letter-animate", "description": "hero headline letters settle on load; body never animates", "technology": "CSS+JS", "params": { "split_strategy": "by-word", "animation_per_unit": "short", "stagger": "20ms", "effect_style": "release" } },
+    "cursor_effects": { "enabled": false, "type": "none", "description": "", "params": {} },
+    "image_effects": { "type": "none", "description": "", "technology": "", "params": {} },
+    "glassmorphism_neumorphism": { "enabled": false, "style": "none", "params": {} },
+    "canvas_drawings": { "enabled": false, "type": "none", "description": "", "technology": "", "params": {} },
+    "svg_animations": { "enabled": false, "type": "none", "description": "", "technology": "", "params": {} },
+    "composite_notes": "pear DNA is intentionally motion-dry. For AICADBridge the WARM GROUND + EDITORIAL SERIF + RHYTHM come from here; the single dark product object will be the only 'live surface', carrying its own neon accents from the UI DNA."
+  }
+}
