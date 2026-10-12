@@ -1,11 +1,11 @@
-"""Arka plan CAD üretim görevi: LLM çağrısı + Self-Healing döngüsü."""
+"""Arka plan CAD üretim görevi: LLM çağrısı + Self-Healing döngüsü (Fusion 360 & SolidWorks)."""
 
 import re
 import traceback
 
-from aicad_bridge import events, messaging
+from aicad_bridge import adapters, events, messaging
 from aicad_bridge.llm.client import call_llm_api
-from aicad_bridge.llm.prompt import SYSTEM_PROMPT, extract_python_code
+from aicad_bridge.llm.prompt import extract_python_code, get_system_prompt
 from aicad_bridge.llm.registry import PROVIDERS
 from aicad_bridge.runtime import aicad_log
 
@@ -18,35 +18,42 @@ def generate_cad_worker(data):
     api_key = data.get('apiKey', '')
     base_url = data.get('baseUrl') or data.get('base_url')
     timeout = data.get('timeout', 90)
+    cad_target = adapters.get_active_cad_target(data.get('cad_target'))
+    cad_label = 'SolidWorks' if cad_target == 'solidworks' else 'Fusion 360'
+    sys_prompt = get_system_prompt(cad_target)
+
     if provider == 'local':
         timeout = max(timeout, 150)
-    aicad_log(f"generate_cad_worker başladı: provider={provider}, model={model}, baseUrl={base_url}, prompt='{prompt}'")
+    aicad_log(f"generate_cad_worker başladı: cad={cad_target}, provider={provider}, model={model}, prompt='{prompt}'")
 
     messages = [
-        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'system', 'content': sys_prompt},
         {'role': 'user', 'content': prompt}
     ]
 
-    # Mevcut Fusion 360 tasarımını kontrol et ve varsa bağlama ekle
+    # Mevcut CAD tasarımını kontrol et ve varsa bağlama ekle
     try:
-        current_design = events.get_design_state_on_main_thread()
+        current_design = events.get_design_state_on_main_thread(cad_target=cad_target)
         if current_design and current_design.get('has_design') and current_design.get('bodies_count', 0) > 0:
-            if '[MEVCUT FUSION 360 TASARIM DURUMU]' not in prompt:
+            if '[MEVCUT' not in prompt:
                 design_summary = current_design.get('summary_text', '')
-                design_addon = (
-                    f"\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n{design_summary}\n"
-                    f"(Lütfen yeni parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır "
-                    f"ve kesinlikle FeatureOperations.NewBodyFeatureOperation kullan.)"
-                )
+                if cad_target == 'solidworks':
+                    design_addon = (
+                        f"\n\n[MEVCUT SOLIDWORKS TASARIM DURUMU]:\n{design_summary}\n"
+                        f"(Lütfen yeni parçayı mevcut katı gövdelere uygun koordinatlarda konumlandır "
+                        f"ve `sw` yardımcı fonksiyonlarını milimetre cinsinden kullan.)"
+                    )
+                else:
+                    design_addon = (
+                        f"\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n{design_summary}\n"
+                        f"(Lütfen yeni parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır "
+                        f"ve kesinlikle FeatureOperations.NewBodyFeatureOperation kullan.)"
+                    )
                 if re.search(r'devam|sonraki|sıradak|ilerle|kaldığın|tamam|ekle|yap|bitir|çiz|oluştur|model nerede|görünmüyor', prompt, re.I):
                     design_addon += (
-                        "\n\n[KESİNTİSİZ ADIM ADIM MODELLEME TALİMATI]:\n"
-                        "Kullanıcı tasarıma devam etmeni ve Fusion 360 ekranında somut 3D parçayı hemen oluşturmanı istiyor! "
-                        "KESİNLİKLE soru sorma, 'şunu mu yapalım bunu mu' gibi seçenek sunup bekleme! "
-                        "Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı kendin belirleyerek "
-                        "DOĞRUDAN Fusion 360 Python kodunu ```python ... ``` bloğu içinde üret!\n"
-                        "ÖNEMLİ ZORUNLULUK: Kodun sonunda çizdiğin kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile "
-                        "mutlaka 3D katı gövdeye dönüştür! Sadece 2D eskiz çizip bırakma!"
+                        f"\n\n[KESİNTİSİZ ADIM ADIM MODELLEME TALİMATI]:\n"
+                        f"Kullanıcı tasarıma devam etmeni ve {cad_label} ekranında somut 3D parçayı hemen oluşturmanı istiyor! "
+                        f"KESİNLİKLE soru sorma, doğrudan {cad_label} Python kodunu ```python ... ``` bloğu içinde üret!"
                     )
                 messages[1]['content'] += design_addon
                 aicad_log(f"generate_cad_worker: Tasarım durumu LLM bağlamına eklendi ({current_design.get('bodies_count')} gövde).")
@@ -82,20 +89,20 @@ def generate_cad_worker(data):
         })
         return
 
-    # 1. Deneme: Fusion'da Çalıştırma
+    # 1. Deneme: CAD Ortamında Çalıştırma
     messaging.send_palette_message('statusUpdate', {
         'status': 'loading',
-        'message': 'Fusion 360 içinde yürütülüyor...',
+        'message': f'{cad_label} içinde yürütülüyor...',
     })
 
-    exec_res = events.run_code_on_main_thread(code)
+    exec_res = events.run_code_on_main_thread(code, cad_target=cad_target)
 
     if exec_res['success']:
         new_b = exec_res.get('new_bodies', [])
         b_info = f" ({', '.join(new_b)} eklendi)" if new_b else ""
         messaging.send_palette_message('taskResult', {
             'status': 'success',
-            'message': f'CAD Modeli başarıyla oluşturuldu!{b_info}',
+            'message': f'CAD Modeli {cad_label} içinde başarıyla oluşturuldu!{b_info}',
         })
         return
 
@@ -117,23 +124,29 @@ def generate_cad_worker(data):
         })
 
         specific_tip = ""
-        if 'HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ' in err_msg or 'No bodies added' in err_msg:
-            specific_tip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili extrudes.add(extInput) ve NewBodyFeatureOperation ile 3D katı gövdeye dönüştür.\n"
-        elif 'Kesilecek veya kesişecek hedef gövde bulunamadı' in err_msg:
-            specific_tip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n"
-        elif 'profiles.item' in err_msg:
-            specific_tip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n"
+        if cad_target == 'solidworks':
+            if 'adsk' in err_msg:
+                specific_tip = "ÖNEMLİ İPUCU: Bu ortam SolidWorks'tür! Kesinlikle `import adsk` kullanma; hazır enjekte edilen `sw` yardımcısını (`sw.extrude_cylinder`, `sw.extrude_box`, `sw.cut_hole`, vb.) kullan.\n"
+            elif 'HİÇBİR YENİ 3D KATI GÖVDE' in err_msg:
+                specific_tip = "ÖNEMLİ İPUCU: 3D katı gövde oluşturulmadı! `sw.extrude_cylinder(...)`, `sw.extrude_box(...)` veya `featMgr.FeatureExtrusion2(...)` çağrısı yap.\n"
+        else:
+            if 'HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ' in err_msg or 'No bodies added' in err_msg:
+                specific_tip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili extrudes.add(extInput) ve NewBodyFeatureOperation ile 3D katı gövdeye dönüştür.\n"
+            elif 'Kesilecek veya kesişecek hedef gövde bulunamadı' in err_msg:
+                specific_tip = "ÖNEMLİ İPUCU: CutFeatureOperation veya JoinFeatureOperation boşlukta hata verir! Kesinlikle 'adsk.fusion.FeatureOperations.NewBodyFeatureOperation' kullan.\n"
+            elif 'profiles.item' in err_msg:
+                specific_tip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n"
 
         healing_prompt = (
-            f"Fusion 360 API şu hatayı verdi ({healing_attempts}. deneme):\n{err_msg}\n\n"
+            f"{cad_label} API şu hatayı verdi ({healing_attempts}. deneme):\n{err_msg}\n\n"
             f"Detaylı Traceback:\n{err_tb}\n\n"
             f"{specific_tip}"
             f"Lütfen çizimi, düzlemi veya parametreleri düzelterek kodu yeniden ver. "
-            f"Sadece ```python ... ``` bloğu içinde saf ve hatasız Fusion 360 Python kodu döndür."
+            f"Sadece ```python ... ``` bloğu içinde saf ve hatasız {cad_label} Python kodu döndür."
         )
 
         messages_attempt = [
-            {'role': 'system', 'content': SYSTEM_PROMPT},
+            {'role': 'system', 'content': sys_prompt},
             {'role': 'user', 'content': prompt},
             {'role': 'assistant', 'content': f"```python\n{current_code}\n```"},
             {'role': 'user', 'content': healing_prompt}
@@ -157,7 +170,7 @@ def generate_cad_worker(data):
             'message': f'Düzeltilen kod yürütülüyor ({healing_attempts}/{max_healing_attempts})...',
         })
 
-        current_exec_res = events.run_code_on_main_thread(current_code)
+        current_exec_res = events.run_code_on_main_thread(current_code, cad_target=cad_target)
         if current_exec_res.get('success'):
             break
 

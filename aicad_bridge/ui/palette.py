@@ -7,7 +7,7 @@ import traceback
 
 import adsk.core
 
-from aicad_bridge import config as app_config, runtime, worker
+from aicad_bridge import adapters, config as app_config, runtime, worker
 from aicad_bridge.adapters import fusion360
 from aicad_bridge.llm import pipeline
 from aicad_bridge.llm.client import call_llm_api
@@ -26,11 +26,19 @@ class PaletteHTMLEventHandler(adsk.core.HTMLEventHandler):
             aicad_log(f"PaletteHTMLEventHandler: action='{action}' alındı.")
             data = json.loads(data_str) if data_str else {}
 
+            req_target = adapters.get_active_cad_target(data.get('cad_target'))
+            active_adapter = adapters.get_adapter(req_target)
+
             if action == 'executeCADCode':
                 code = data.get('code', '')
-                aicad_log(f"executeCADCode doğrudan icra ediliyor (uzunluk: {len(code)})")
-                res = fusion360.execute_code(code)
+                aicad_log(f"executeCADCode ({req_target}) doğrudan icra ediliyor (uzunluk: {len(code)})")
+                res = active_adapter.execute_code(code)
                 html_args.returnData = json.dumps(res)
+                return
+
+            elif action == 'setCadTarget':
+                new_t = adapters.set_active_cad_target(data.get('cad_target') or 'fusion360')
+                html_args.returnData = json.dumps({'ok': True, 'cad_target': new_t})
                 return
 
             elif action == 'callLLM':
@@ -86,8 +94,6 @@ class PaletteHTMLEventHandler(adsk.core.HTMLEventHandler):
                 return
 
             elif action == 'getConfig':
-                # .env / config.py tabanlı yapılandırmayı UI'ya döndürür
-                # (planner/coder model varsayılanları, max_tokens, yedek model listesi)
                 try:
                     res = app_config.get_public_settings()
                 except Exception as e:
@@ -97,16 +103,13 @@ class PaletteHTMLEventHandler(adsk.core.HTMLEventHandler):
                 return
 
             elif action == 'pipelineHelper':
-                # İki aşamalı hat (Planner/Coder) yardımcıları.
-                # LLM çağrısı YAPMAZ; prompt kurma, plan doğrulama, snippet seçimi,
-                # geometrik doğrulama ve viewport görüntüsü gibi hızlı işler yapar.
-                # Handler zaten Fusion ana thread'inde çalıştığı için inspect ve
-                # viewport yakalama doğrudan çağrılır.
                 try:
+                    data_with_target = dict(data)
+                    data_with_target.setdefault('cad_target', req_target)
                     res = pipeline.run_pipeline_helper(
-                        data,
-                        inspect_state=fusion360.inspect_current_design,
-                        capture_viewport=fusion360.capture_viewport_image)
+                        data_with_target,
+                        inspect_state=active_adapter.inspect_current_design,
+                        capture_viewport=active_adapter.capture_viewport_image)
                 except Exception as e:
                     tb = traceback.format_exc()
                     aicad_log(f"pipelineHelper hatası: {e}\n{tb}")
@@ -115,8 +118,8 @@ class PaletteHTMLEventHandler(adsk.core.HTMLEventHandler):
                 return
 
             elif action in ('getDesignState', 'inspectDesign'):
-                aicad_log("PaletteHTMLEventHandler: getDesignState çağrıldı.")
-                res = fusion360.inspect_current_design()
+                aicad_log(f"PaletteHTMLEventHandler: getDesignState ({req_target}) çağrıldı.")
+                res = active_adapter.inspect_current_design()
                 html_args.returnData = json.dumps({'success': True, 'design': res})
                 return
 

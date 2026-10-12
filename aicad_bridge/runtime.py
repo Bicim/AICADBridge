@@ -21,6 +21,7 @@ custom_event = None
 handlers = []
 local_http_server = None
 local_http_thread = None
+active_cad_target = None
 
 task_lock = threading.Lock()
 pending_tasks = {}

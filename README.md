@@ -1,33 +1,45 @@
-﻿# 🤖 AICADBridge — AI-Powered CAD Studio for Autodesk Fusion 360
+# 🤖 AICADBridge — AI-Powered CAD Studio for SolidWorks (Adam-CAD) & Autodesk Fusion 360
 
 <p align="center">
-  <strong>Doğal dil komutlarıyla Fusion 360'ta 3D modelleme yapın.</strong><br/>
-  Design in 3D using natural language with Claude, GPT-4o, Gemini, DeepSeek or Ollama.
+  <strong>Doğal dil komutlarıyla SolidWorks ve Fusion 360'ta 3D parametrik modelleme yapın.</strong><br/>
+  Design in 3D using natural language with SolidWorks COM API, Adam-CAD Parametric Sliders & Fusion 360.
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/SolidWorks-COM%20%2B%20Adam--CAD-red" />
   <img src="https://img.shields.io/badge/Fusion%20360-AddIn-orange?logo=autodesk" />
   <img src="https://img.shields.io/badge/Python-3.x-blue?logo=python" />
-  <img src="https://img.shields.io/badge/AI-Claude%20%7C%20GPT--4o%20%7C%20Gemini%20%7C%20Ollama-purple" />
-  <img src="https://img.shields.io/badge/Version-1.0.0-green" />
+  <img src="https://img.shields.io/badge/AI-Claude%20%7C%20GPT--4o%20%7C%20Gemini%20%7C%20Groq%20%7C%20Ollama-purple" />
+  <img src="https://img.shields.io/badge/Version-1.1.0-green" />
   <img src="https://img.shields.io/badge/OS-Windows%20%7C%20macOS-lightgrey" />
 </p>
 
 ---
 
+## 🛠️ SolidWorks + Adam-CAD (CADAM) Hızlı Başlangıç
+
+1. Bilgisayarınızda **SolidWorks** uygulamasını açın (açık parça yoksa köprü otomatik yeni bir `.SLDPRT` açar).
+2. Proje klasöründeki **`baslat_solidworks.bat`** dosyasına çift tıklayın (veya terminalde `py solidworks_server.py` çalıştırın).
+3. Tarayıcınızda otomatik olarak `http://127.0.0.1:49876/app?cad=solidworks` açılır:
+   - Üst bardaki **🛠️ SolidWorks + Adam-CAD** seçici ile SolidWorks ve Fusion 360 arasında anında geçiş yapabilirsiniz.
+   - **🎛️ Parametrik Mod (Adam-CAD)** panelinden hazır şablonlara (*Mil Flanşı*, *L-Braket*, *Altıgen Göbekli Çark*, *Muhafaza Kutusu*) tıklayarak veya doğal dilde parça tarif ederek **canlı slider'larla** SolidWorks modelini gerçek zamanlı güncelleyebilirsiniz.
+
+---
+
 ## 🎯 Projenin Amacı / Purpose
 
-**Türkçe:** Kullanıcının doğal dilde verdiği 3D CAD modelleme komutlarını yapay zeka modelleri aracılığıyla Autodesk Fusion 360 Python API koduna dönüştürür ve anında çalıştırır.
+**Türkçe:** Kullanıcının doğal dilde verdiği 3D CAD modelleme komutlarını yapay zeka modelleri aracılığıyla **SolidWorks (COM API / Adam-CAD)** ve **Autodesk Fusion 360 Python API** koduna dönüştürür ve anında çalıştırır.
 
-**English:** Converts natural language 3D CAD modeling commands into Autodesk Fusion 360 Python API code via AI models and executes them instantly.
+**English:** Converts natural language 3D CAD modeling commands into **SolidWorks COM API** and **Autodesk Fusion 360 Python API** code via AI models and executes them instantly.
 
 ### ✨ Temel Özellikler / Key Features
 
+- 🛠️ **SolidWorks + Adam-CAD Desteği**: `win32com.client` (`SldWorks.Application`) üzerinden doğrudan katı modelleme ve Adam-CAD tarzı milimetre tabanlı parametrik `sw` yardımcısı
 - 🗣️ **Doğal Dil → 3D Model**: Türkçe veya İngilizce komutla anında CAD modeli
 - 🔁 **Self-Healing CAD**: Hata durumunda otomatik hata yakalama ve onarma döngüsü
-- 🎛️ **Parametric Sliders**: Canlı parametre kontrolü paneli
-- 🌐 **Çift Mod Mimarisi**: Fusion 360 içi palet + harici tarayıcı desteği
-- 🤖 **Çoklu AI Desteği**: Claude, GPT-4o, Gemini, DeepSeek, Ollama/LM Studio
+- 🎛️ **Adam-CAD Parametric Sliders**: Canlı parametre kontrolü paneli ve hazır mühendislik şablonları
+- 🌐 **Çift Mod Mimarisi**: Bağımsız SolidWorks Web Köprüsü + Fusion 360 içi palet desteği
+- 🤖 **Çoklu AI Desteği**: Claude, GPT-4o, Gemini, Groq, DeepSeek, Ollama/LM Studio
 - 🌑 **Dark Neon UI**: Modern karanlık temalı kullanıcı arayüzü
 
 ### 📸 Uygulamadan Görünümler / Screenshots
