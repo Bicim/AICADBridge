@@ -1,242 +1,249 @@
-# 🤖 AICADBridge — AI-Powered CAD Studio for SolidWorks (Adam-CAD) & Autodesk Fusion 360
+# 🤖 AICADBridge — SolidWorks (Adam-CAD / CADAM) & Autodesk Fusion 360 için Yapay Zeka Destekli 3D CAD Stüdyosu
 
 <p align="center">
-  <strong>Doğal dil komutlarıyla SolidWorks ve Fusion 360'ta 3D parametrik modelleme yapın.</strong><br/>
-  Design in 3D using natural language with SolidWorks COM API, Adam-CAD Parametric Sliders & Fusion 360.
+  <strong>Doğal dil komutlarıyla ve Adam-CAD canlı parametrik slider'larıyla SolidWorks ve Fusion 360'ta anında 3D katı modelleme yapın.</strong><br/>
+  Design in 3D using natural language with SolidWorks COM API, Adam-CAD Parametric Sliders & Autodesk Fusion 360.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/SolidWorks-COM%20%2B%20Adam--CAD-red" />
+  <img src="https://img.shields.io/badge/SolidWorks-COM%20API%20%2B%20Adam--CAD-red" />
   <img src="https://img.shields.io/badge/Fusion%20360-AddIn-orange?logo=autodesk" />
-  <img src="https://img.shields.io/badge/Python-3.x-blue?logo=python" />
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" />
   <img src="https://img.shields.io/badge/AI-Claude%20%7C%20GPT--4o%20%7C%20Gemini%20%7C%20Groq%20%7C%20Ollama-purple" />
-  <img src="https://img.shields.io/badge/Version-1.1.0-green" />
+  <img src="https://img.shields.io/badge/Tests-55%20Passed-brightgreen" />
   <img src="https://img.shields.io/badge/OS-Windows%20%7C%20macOS-lightgrey" />
 </p>
 
 ---
 
-## 🛠️ SolidWorks + Adam-CAD (CADAM) Hızlı Başlangıç
-
-1. Bilgisayarınızda **SolidWorks** uygulamasını açın (açık parça yoksa köprü otomatik yeni bir `.SLDPRT` açar).
-2. Proje klasöründeki **`baslat_solidworks.bat`** dosyasına çift tıklayın (veya terminalde `py solidworks_server.py` çalıştırın).
-3. Tarayıcınızda otomatik olarak `http://127.0.0.1:49876/app?cad=solidworks` açılır:
-   - Üst bardaki **🛠️ SolidWorks + Adam-CAD** seçici ile SolidWorks ve Fusion 360 arasında anında geçiş yapabilirsiniz.
-   - **🎛️ Parametrik Mod (Adam-CAD)** panelinden hazır şablonlara (*Mil Flanşı*, *L-Braket*, *Altıgen Göbekli Çark*, *Muhafaza Kutusu*) tıklayarak veya doğal dilde parça tarif ederek **canlı slider'larla** SolidWorks modelini gerçek zamanlı güncelleyebilirsiniz.
+## 📌 İçindekiler
+1. [Projenin Amacı ve Özellikler](#-projenin-amacı--purpose)
+2. [🛠️ SolidWorks + Adam-CAD (CADAM) Kurulumu ve Kullanımı (Adım Adım)](#️-solidworks--adam-cad-cadam-kurulumu-ve-kullanımı-adım-adım)
+3. [🎛️ Adam-CAD Canlı Parametrik Modelleme Rehberi](#️-adam-cad-canlı-parametrik-modelleme-rehberi)
+4. [📐 `sw` (`SolidWorksCADHelper`) Milimetre Tabanlı API Referansı](#-sw-solidworkscadhelper-milimetre-tabanlı-api-referansı)
+5. [🏗️ Mimari ve Dosya Yapısı](#️-mimari--architecture)
+6. [🚀 Fusion 360 Eklenti Kurulumu](#-fusion-360-kurulumu--installation)
+7. [🎮 Doğal Dil Örnek Komutları](#-örnek-komutlar--example-commands)
+8. [❓ Sorun Giderme (Troubleshooting)](#-sorun-giderme-troubleshooting)
 
 ---
 
 ## 🎯 Projenin Amacı / Purpose
 
-**Türkçe:** Kullanıcının doğal dilde verdiği 3D CAD modelleme komutlarını yapay zeka modelleri aracılığıyla **SolidWorks (COM API / Adam-CAD)** ve **Autodesk Fusion 360 Python API** koduna dönüştürür ve anında çalıştırır.
-
-**English:** Converts natural language 3D CAD modeling commands into **SolidWorks COM API** and **Autodesk Fusion 360 Python API** code via AI models and executes them instantly.
+**Türkçe:** Kullanıcının doğal dilde (Türkçe veya İngilizce) verdiği 3D CAD modelleme komutlarını yapay zeka modelleri aracılığıyla **SolidWorks (`SldWorks.Application` COM API)** veya **Autodesk Fusion 360 Python API** koduna dönüştürür, katı modeli ekranda anında oluşturur ve **Adam-CAD (CADAM)** mimarisiyle canlı slider'lar üzerinden ölçüleri gerçek zamanlı değiştirmenizi sağlar.
 
 ### ✨ Temel Özellikler / Key Features
 
-- 🛠️ **SolidWorks + Adam-CAD Desteği**: `win32com.client` (`SldWorks.Application`) üzerinden doğrudan katı modelleme ve Adam-CAD tarzı milimetre tabanlı parametrik `sw` yardımcısı
-- 🗣️ **Doğal Dil → 3D Model**: Türkçe veya İngilizce komutla anında CAD modeli
-- 🔁 **Self-Healing CAD**: Hata durumunda otomatik hata yakalama ve onarma döngüsü
-- 🎛️ **Adam-CAD Parametric Sliders**: Canlı parametre kontrolü paneli ve hazır mühendislik şablonları
-- 🌐 **Çift Mod Mimarisi**: Bağımsız SolidWorks Web Köprüsü + Fusion 360 içi palet desteği
-- 🤖 **Çoklu AI Desteği**: Claude, GPT-4o, Gemini, Groq, DeepSeek, Ollama/LM Studio
-- 🌑 **Dark Neon UI**: Modern karanlık temalı kullanıcı arayüzü
+- 🛠️ **Tam SolidWorks COM API Entegrasyonu**: SolidWorks içine ekstra eklenti kurmaya gerek kalmadan `win32com.client` üzerinden doğrudan açık olan SolidWorks oturumuna bağlanır; açık parça yoksa otomatik yeni `.SLDPRT` açar.
+- 🌍 **Dil Bağımsız Düzlem Seçici (TR / EN)**: SolidWorks'ü Türkçe (*Üst Düzlem, Ön Düzlem, Sağ Düzlem*) veya İngilizce (*Top Plane, Front Plane, Right Plane*) kullansanız bile düzlemleri otomatik tanır.
+- 🎛️ **Adam-CAD (CADAM) Canlı Parametrik Slider'lar**: Modelin çap, kalınlık, delik sayısı, genişlik gibi tüm parametrelerini kaydırma çubuklarıyla (slider) değiştirip SolidWorks ekranında anında yeniden oluşturur (`reset_part` + `EditRebuild3`).
+- ⚡ **Hazır Mühendislik Şablonları (API Anahtarsız Test)**: *Mil Flanşı*, *L-Braket*, *Altıgen Göbekli Çark* ve *Elektronik Muhafaza Kutusu* şablonlarıyla LLM API anahtarı girmeden bile SolidWorks bağlantısını ve canlı slider'ları tek tıkla test edebilirsiniz.
+- 🧠 **İki Aşamalı Üretim Hattı (Planner → Coder)**: Karmaşık parçaları önce JSON unsur planına (`extrude`, `cut`, `hole`, `fillet`, `chamfer`, `revolve`, `shell`, `pattern`) ayırır, ardından her adımı referans kod kütüphanesiyle (`snippets/solidworks/`) kodlayıp doğrular.
+- 🔁 **Self-Healing CAD (Otomatik Hata Onarma)**: Üretilen kodda bir API veya geometri hatası oluşursa hatayı yakalar ve yapay zekaya otomatik düzelttirir.
+- 🤖 **Çoklu AI & Yerel Model Desteği**: Groq (Llama 3.3), Google Gemini, Anthropic Claude, OpenAI, DeepSeek, OpenRouter ve yerel **Ollama / LM Studio**.
 
-### 📸 Uygulamadan Görünümler / Screenshots
+---
 
-| İki Aşamalı Üretim Hattı (Planner → Coder) | Parametrik Sliderlar |
-|:---:|:---:|
-| ![İki aşamalı üretim hattı: plan adım listesi, geometrik doğrulama ve görsel kontrol satırları](docs/images/app_pipeline.png) | ![Parametrik modelleme: canlı slider paneli](docs/images/app_parametric.png) |
+## 🛠️ SolidWorks + Adam-CAD (CADAM) Kurulumu ve Kullanımı (Adım Adım)
 
-*Solda: plan adım listesi (⏳/✅ durumlu), 🔍 geometrik doğrulama ve 👁️ görsel kontrol satırları. Sağda: parametrik modelleme panelinde canlı slider kontrolü.*
+SolidWorks entegrasyonu Windows üzerinde COM API (`pywin32`) ile çalışır. SolidWorks içine herhangi bir DLL veya Add-In kopyalamanıza **gerek yoktur**.
 
-![AI CAD Studio karşılama ekranı](docs/images/app_welcome.png)
+### 1️⃣ Gereksinimleri Yükleyin
+
+Bilgisayarınızda **SolidWorks** ve **Python 3.10+** kurulu olmalıdır. Terminal (PowerShell veya CMD) açıp `pywin32` kütüphanesinin kurulu olduğundan emin olun:
+
+```powershell
+git clone -b solidworks-adacad https://github.com/canmuratt-hub/AICADBridge.git
+cd AICADBridge
+py -m pip install pywin32 pillow
+```
+
+### 2️⃣ SolidWorks'ü Açın
+
+- Bilgisayarınızda **SolidWorks** programını başlatın.
+- İster boş bir **Parça (Part / `.SLDPRT`)** açın, ister ana ekranda bırakın (köprü ilk çizim komutunda otomatik olarak yeni bir Parça dokümanı açacaktır).
+
+### 3️⃣ Köprü Sunucusunu Başlatın (Tek Tık)
+
+Klasör içindeki **`baslat_solidworks.bat`** dosyasına çift tıklayın veya terminalden şu komutu çalıştırın:
+
+```powershell
+py solidworks_server.py
+```
+
+Sunucu başladığında:
+1. `http://127.0.0.1:49876` portunda yerel köprü sunucusu açılır.
+2. Varsayılan web tarayıcınızda otomatik olarak **`http://127.0.0.1:49876/app?cad=solidworks`** adresi açılır.
+3. Üst bardaki durum rozetinde **🟢 SolidWorks Bağlı** ibaresi görünür.
+
+> 💡 **CAD Hedefi Değiştirme:** Arayüzün sağ üst köşesindeki **🛠️ SolidWorks + Adam-CAD** butonuna tıklayarak istediğiniz an **SolidWorks** ve **Fusion 360** modları arasında canlı geçiş yapabilirsiniz.
+
+### 4️⃣ Yapay Zeka (AI) Sağlayıcınızı Bağlayın
+
+1. Sol menüden veya üst bardan **⚙️ Ayarlar** butonuna tıklayın.
+2. Kullanmak istediğiniz sağlayıcıyı seçin:
+   - **Groq / Gemini / OpenAI / Claude / DeepSeek:** API anahtarınızı yapıştırıp **Bağlan** butonuna basın, ardından **Modelleri Listele** ile modelinizi seçin.
+   - **Ollama / LM Studio (Ücretsiz & Yerel):** Üstten **🖥️ Yerel Model** sekmesini seçin ve yerel modelinizi işaretleyin.
+
+---
+
+## 🎛️ Adam-CAD Canlı Parametrik Modelleme Rehberi
+
+Arayüzün üst kısmındaki **🎛️ Parametrik** butonuna tıkladığınızda **Adam-CAD (CADAM)** paneli açılır. Bu modu iki şekilde kullanabilirsiniz:
+
+### Yöntem A: Hazır Mühendislik Şablonları (Anında & API Anahtarsız)
+Parametrik panelin altındaki hazır çiplerden birine tıklayın:
+- **⚙️ Mil Flanşı**: Dış çap, göbek çapı, mil deliği çapı, flanş kalınlığı, PCD ve cıvata sayısı slider'larıyla 6 delikli flanş çizer.
+- **📐 L-Braket**: Genişlik, taban uzunluğu, dikey kol yüksekliği, et kalınlığı ve montaj deliği çapı slider'larıyla L-braket çizer.
+- **🔩 Altıgen Göbekli Çark**: Dış çap, gövde kalınlığı, çokgen göbek çapı, kenar sayısı, mil çapı ve hafifletme delikleriyle kasnak/çark çizer.
+- **📦 Muhafaza Kutusu**: Genişlik (X), uzunluk (Y), yükseklik (Z) ve duvar kalınlığı slider'larıyla içi boşaltılmış kutu çizer.
+
+Şablona tıkladığınız anda parça SolidWorks ekranında oluşur. **Slider'ları sağa-sola kaydırdığınızda** (400 ms debounce ile) SolidWorks modeli gerçek zamanlı olarak yeni ölçülerle yeniden çizilir!
+
+### Yöntem B: Yapay Zeka ile Özel Parametrik Parça Üretimi
+1. Parametrik kutuya istediğiniz parçayı yazın (ör. *"4 köşesinde M8 montaj deliği olan 120x80mm dikdörtgen motor bağlantı plakası, ortasında 40mm rulman yuvası"*).
+2. **⚡ Parametrik Oluştur** butonuna basın.
+3. Yapay zeka parçayı SolidWorks'te çizer ve o parçaya özel boyut slider'larını otomatik olarak ekrana dizerek size canlı kontrol verir.
+
+---
+
+## 📐 `sw` (`SolidWorksCADHelper`) Milimetre Tabanlı API Referansı
+
+Normalde SolidWorks COM API'si tüm uzunlukları **metre (m)** cinsinden bekler ve `SelectByID2` çağrılarında dil/VARIANT uyumsuzlukları yaşanır. AICADBridge, çalışma alanına önceden enjekte edilen **`sw`** (`SolidWorksCADHelper`) nesnesi ile tüm işlemleri **milimetre (mm)** cinsinden ve dil bağımsız olarak yürütür:
+
+| Metod (Tüm Ölçüler **mm**) | Açıklama |
+| :--- | :--- |
+| `sw.extrude_cylinder(diameter_mm, height_mm, x_mm=0, y_mm=0, plane='Top', merge=True)` | Belirtilen düzlemde daire çizip 3D silindir katılar (Boss-Extrude). |
+| `sw.extrude_box(width_mm, length_mm, height_mm, x_mm=0, y_mm=0, plane='Top', centered=True, merge=True)` | Merkezden veya köşeden dikdörtgen çizip 3D prizma/plaka katılar. |
+| `sw.extrude_polygon(sides, diameter_mm, height_mm, x_mm=0, y_mm=0, plane='Top', merge=True)` | Çokgen (örn. `sides=6` altıgen somun/göbek) profil çizip katılar. |
+| `sw.cut_hole(diameter_mm, depth_mm=None, x_mm=0, y_mm=0, plane='Top', through_all=False)` | Mevcut katı gövde üzerinde dairesel delik açar (Extruded Cut). |
+| `sw.cut_bolt_circle(hole_dia_mm, pcd_mm, count, depth_mm=None, plane='Top')` | Flanş vb. parçalar üzerinde dairesel dizilimli (`count` adet) cıvata delikleri açar. |
+| `sw.cut_box(width_mm, length_mm, depth_mm=None, x_mm=0, y_mm=0, plane='Top')` | Dikdörtgen cep, kanal veya yuva kesmesi yapar. |
+| `sw.fillet_edges(radius_mm)` | Aktif katı gövdenin kenarlarına radyus (Fillet) kırar. |
+| `sw.chamfer_edges(distance_mm, angle_deg=45)` | Aktif katı gövdenin kenarlarına pah (Chamfer) kırar. |
+| `sw.shell_body(wall_thickness_mm, remove_top_face=True)` | Gövdenin üst yüzünü açıp belirtilen et kalınlığıyla içini boşaltır (Shell). |
+| `sw.revolve_profile(points_mm, angle_deg=360, plane='Front', merge=True)` | `[(r1, z1), (r2, z2), ...]` koordinatlarından kapalı profili eksen etrafında döndürerek katılar (Revolve). |
+| `sw.reset_part()` | Parametrik slider güncellemesi öncesinde parça unsurlarını temizler. |
+| `sw.rebuild()` | Modeli yeniden hesaplar (`EditRebuild3`) ve ekrana tam sığdırır (`ViewZoomtofit2`). |
 
 ---
 
 ## 🏗️ Mimari / Architecture
 
-AICADBridge hem Fusion 360'ın dahili web paletinde hem de harici bir Chrome/Edge tarayıcısında sorunsuz çalışır:
+AICADBridge, Çoklu-CAD Adaptör Yönlendiricisi (`aicad_bridge/adapters/`) sayesinde hem **SolidWorks** hem de **Autodesk Fusion 360** ile aynı arayüz üzerinden çalışır:
 
-`
-┌─────────────────────────────────────────────────────────┐
-│                     index.html (UI)                     │
-│              Dark Neon Chat & Parametric Panel          │
-└───────────────┬─────────────────────┬───────────────────┘
-                │                     │
-      Dahili Palet               Harici Tarayıcı
-  adsk.fusionSendData        HTTP POST localhost:49876
-                │                     │
-                └──────────┬──────────┘
-                           │
-              ┌────────────▼────────────┐
-              │      AICADBridge.py     │
-              │   (Fusion 360 AddIn)    │
-              └────────┬────────┬───────┘
-                       │        │
-             Fusion 360 API    LLM Providers
-             (CPython Runtime)  Claude / GPT-4o
-                                Gemini / Ollama
-`
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                          index.html (UI)                            │
+│        Dark Neon Sohbet + Adam-CAD Canlı Parametrik Sliderlar       │
+└───────────────┬─────────────────────────────────────┬───────────────┘
+                │                                     │
+     HTTP POST 127.0.0.1:49876              Dahili Palet / HTTP
+      (cad_target='solidworks')            (cad_target='fusion360')
+                │                                     │
+┌───────────────▼───────────────┐     ┌───────────────▼───────────────┐
+│     solidworks_server.py      │     │        AICADBridge.py         │
+│  aicad_bridge/adapters/       │     │  aicad_bridge/adapters/       │
+│        solidworks.py          │     │         fusion360.py          │
+└───────────────┬───────────────┘     └───────────────┬───────────────┘
+                │                                     │
+     win32com (COM Bridge)                    adsk.core / adsk.fusion
+      SldWorks.Application                      Fusion 360 API
+```
 
-### 1. Fusion 360 İçi Mod (Embedded Webview)
-Fusion 360 paletinde dsk.core.HTMLEvent ve dsk.fusionSendData kullanılır.
+### 📁 Dosya Yapısı / File Structure
 
-### 2. Harici Tarayıcı Modu (Web Bridge)
-Eklenti localhost:49876 üzerinde HTTP sunucusu açar. index.html dosyasını tarayıcınızdan açarak Fusion 360'ı uzaktan yönetebilirsiniz.
-
----
-
-## 📁 Dosya Yapısı / File Structure
-
-`
+```text
 AICADBridge/
-├── AICADBridge.py              # Ana eklenti dosyası (backend)
-├── AICADBridge.manifest        # Fusion 360 eklenti tanımlayıcısı
-├── index.html                  # Dark Neon kullanıcı arayüzü
-├── .env.example                # Yapılandırma örneği (model ayarları, max_tokens)
-├── config.py                   # Port ve genel yapılandırmalar
-├── aicad_bridge/config.py      # .env okuyucu: planner/coder model + max_tokens ayarları
-├── inspect_state.py            # Fusion 360 durum okuyucu
-├── AddInIcon.svg               # Eklenti ikonu
-├── docs/                       # Dokümantasyon (test komutları) ve ekran görüntüleri (docs/images/)
-├── commands/                   # Komut modülleri
-├── lib/                        # Harici kütüphaneler
-└── resources/                  # Ikon ve kaynak dosyaları
-`
+├── baslat_solidworks.bat           # Tek tıkla SolidWorks + Adam-CAD başlatıcı (Windows)
+├── solidworks_server.py            # Bağımsız SolidWorks HTTP & COM köprü sunucusu
+├── AICADBridge.py                  # Fusion 360 ana eklenti giriş noktası
+├── index.html                      # Dark Neon UI (SolidWorks + Fusion 360 + Adam-CAD Sliders)
+├── .env.example                    # Yapılandırma şablonu (AICAD_CAD_TARGET, model ayarları)
+├── aicad_bridge/
+│   ├── adapters/
+│   │   ├── __init__.py             # Multi-CAD adaptör yönlendiricisi (solidworks | fusion360)
+│   │   ├── solidworks.py           # SolidWorks COM API + SolidWorksCADHelper (sw)
+│   │   └── fusion360.py            # Fusion 360 API adaptörü
+│   ├── bridge/local_http.py        # Yerel HTTP sunucusu (/execute, /design_state, /update_params, /app)
+│   ├── llm/
+│   │   ├── pipeline.py             # İki aşamalı üretim hattı (Planner -> Coder -> Verify)
+│   │   └── prompt.py               # SolidWorks ve Fusion 360 sistem promptları
+│   ├── config.py                   # .env okuyucu ve ayar yöneticisi
+│   ├── events.py                   # Ana iş parçacığı ve çoklu CAD olay yöneticisi
+│   └── worker.py                   # Arka plan LLM ve Self-Healing işçisi
+├── snippets/
+│   ├── loader.py                   # Çoklu CAD snippet yükleyici
+│   ├── index.json                  # Fusion 360 kod şablonları
+│   └── solidworks/                 # SolidWorks (Adam-CAD) doğrulanmış kod şablonları (9 adet)
+└── tests/
+    ├── test_solidworks.py          # SolidWorks adaptörü, snippet ve preset birim testleri
+    ├── test_pipeline.py            # Planner/Coder üretim hattı testleri
+    ├── test_llm.py                 # LLM istemci testleri
+    └── test_config.py              # Yapılandırma testleri
+```
 
 ---
 
-## 🚀 Kurulum / Installation
+## 📸 Uygulamadan Görünümler / Screenshots
 
-### Gereksinimler / Requirements
+| İki Aşamalı Üretim Hattı (Planner → Coder) | Parametrik Sliderlar (Adam-CAD) |
+|:---:|:---:|
+| ![İki aşamalı üretim hattı](docs/images/app_pipeline.png) | ![Parametrik modelleme](docs/images/app_parametric.png) |
 
-- Autodesk Fusion 360 (güncel sürüm)
-- En az bir AI API anahtarı (Claude, OpenAI, Gemini) veya lokal Ollama
+---
 
-### Adımlar / Steps — Görselli Kurulum Rehberi
+## 🚀 Fusion 360 Kurulumu / Installation
 
-#### 1️⃣ GitHub'dan projeyi indirin
+Projeyi SolidWorks dışında **Autodesk Fusion 360** içinde de kullanmak isterseniz:
 
-Tarayıcıyla repo sayfasını açın: **https://github.com/yunusayyldz/AICADBridge**
-Yeşil **`<> Code`** butonuna tıklayıp klonlama URL'sini kopyalayın (veya **Download ZIP** ile doğrudan indirin):
-
-<img src="docs/images/github_repo.png" width="720" alt="GitHub repo sayfası: Code butonu ve klonlama URL'si" />
-
-Ardından terminalde klonlayın:
-
-```bash
-git clone https://github.com/yunusayyldz/AICADBridge.git
-```
-
-#### 2️⃣ Fusion 360 AddIns klasörüne taşıyın
-
-Klonlanan `AICADBridge` klasörünü Fusion 360'ın eklenti dizinine kopyalayın:
-
-```
-Windows: %APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\
-macOS:   ~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/
-```
-
-> 💡 İpucu: Windows'ta Dosya Gezgini adres çubuğuna `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\` yazıp Enter'a basarak klasörü doğrudan açabilirsiniz.
-
-#### 3️⃣ API anahtarlarınızı ve model ayarlarınızı yapılandırın
-
-Repodaki `.env.example` dosyasını `.env` olarak kopyalayın ve düzenleyin:
-
-```bash
-cp .env.example .env
-```
-
-Model adlarını koda gömmek yerine `.env` üzerinden yönetin. **Model adları sağlayıcıya göre sık değişir; kendi sağlayıcınızın güncel model adını sağlayıcının konsolundan kopyalayıp girin.** Örnek:
-
-```env
-# Üretim hattı (İki Aşamalı: Planner -> Coder) — boş bırakılırsa sohbet modeli kullanılır
-AICAD_PLANNER_PROVIDER=openai
-AICAD_PLANNER_MODEL=kendi_saglayicinin_guncel_model_adi
-AICAD_CODER_PROVIDER=anthropic
-AICAD_CODER_MODEL=kendi_saglayicinin_guncel_model_adi
-
-# Yanıt uzunluğu sınırları (varsayılanlar: 16384 / 4096)
-AICAD_MAX_TOKENS=16384
-AICAD_VISION_MAX_TOKENS=4096
-
-# API anahtarları (isteğe bağlı; UI kendi anahtarlarını tarayıcıda saklar)
-ANTHROPIC_API_KEY=your_claude_key
-OPENAI_API_KEY=your_openai_key
-GOOGLE_API_KEY=your_gemini_key
-```
-
-Aynı ayarlar Fusion 360 içindeki **⚙️ Ayarlar → 🏭 Üretim Hattı (Planner & Coder)** bölümünden de yapılabilir (UI seçimi `.env` varsayılanını geçersiz kılar).
-
-#### 4️⃣ Fusion 360'ta etkinleştirin
-
-Fusion 360 içinde **Tools → Add-Ins → Scripts and Add-Ins** penceresini açın, **Add-Ins** sekmesinde (klasör simgesi) **AICADBridge**'i seçin ve **Run**'a basın.
-
-Eklenti çalıştığında sağ tarafta **AI CAD Studio** paleti açılır. Harici tarayıcı modunda `index.html`'i tarayıcıda açtığınızda da aynı arayüz karşınıza çıkar:
-
-<img src="docs/images/app_welcome.png" width="380" alt="AI CAD Studio karşılama ekranı — Dark Neon arayüz" />
-
-#### 5️⃣ AI sağlayıcınızı bağlayın
-
-⚙️ **Ayarlar** → bir sağlayıcı seçin → **API anahtarınızı** girin → **Bağlan** → **Modelleri Listele** ile güncel modelinizi seçin. Planner ve Coder aşamaları için ayrı modeller belirlemek isterseniz **🏭 Üretim Hattı (Planner & Coder)** bölümünü kullanın:
-
-<img src="docs/images/app_settings.png" width="380" alt="Ayarlar paneli: sağlayıcı listesi ve Üretim Hattı (Planner & Coder) model seçimi" />
-
-> ✅ **Hazır!** Artık doğal dille modelleme yapabilirsiniz — örnekler için aşağıdaki **Örnek Komutlar** bölümüne ve [docs/test_prompts.md](docs/test_prompts.md) kılavuzuna bakın.
+1. Klonlanan `AICADBridge` klasörünü Fusion 360 `AddIns` dizinine kopyalayın:
+   - **Windows:** `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\`
+   - **macOS:** `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/`
+2. Fusion 360 içinde **Tools → Add-Ins → Scripts and Add-Ins** penceresinden **AICADBridge**'i seçip **Run** butonuna tıklayın.
+3. Üst bardaki CAD hedef seçiciyi **Fusion 360** konumuna getirin.
 
 ---
 
 ## 🎮 Örnek Komutlar / Example Commands
 
-`
-TR: "50mm çapında, 80mm yüksekliğinde, merkezinde 20mm delik bulunan bir silindir çiz"
-EN: "Create a cylinder 50mm diameter, 80mm height with a 20mm hole in the center"
+Sohbet kutusuna veya Parametrik moda aşağıdaki gibi doğal dil komutları yazabilirsiniz:
 
-TR: "Flanş modeline 4 adet eşit aralıklı M6 cıvata deliği aç"
-EN: "Add 4 equally spaced M6 bolt holes to the flange model"
-`
+```text
+TR: "120mm dış çapında, 15mm kalınlığında, ortasında 35mm mil deliği ve 85mm çap dairesinde 6 adet 10mm cıvata deliği olan bir flanş çiz"
+EN: "Create a flange with 120mm outer diameter, 15mm thickness, 35mm center bore and 6x 10mm bolt holes on an 85mm PCD"
 
-> 🧪 Basitten karmaşığa **10 doğrulanmış test komutu** (beklenen sonuçlar, ölçü/delik/fillet kontrol noktaları ve regression notlarıyla): **[docs/test_prompts.md](docs/test_prompts.md)**
+TR: "100x60x40mm ölçülerinde, et kalınlığı 4mm olan içi boşaltılmış elektronik muhafaza kutusu çiz ve kenarlarına 2mm pah kır"
+EN: "Create a 100x60x40mm hollowed enclosure box with 4mm wall thickness and 2mm chamfered edges"
 
----
-
-## 🤖 Desteklenen AI Modeller / Supported AI Models
-
-Aşağıdaki sağlayıcılar desteklenir; **model adları koda gömülmez** — arayüzdeki "Modelleri Listele" ile sağlayıcınızdan güncel listeyi çekin veya model adını elle girin:
-
-| Provider | Model Seçimi |
-|----------|--------------|
-| **Anthropic** | API'den çekilir (CORS engeli varsa: `.env` → `AICAD_ANTHROPIC_MODELS` ile liste tanımlayın veya adı elle girin) |
-| **OpenAI** | API'den çekilir ("Modelleri Listele") |
-| **Google** | API'den çekilir ("Modelleri Listele") |
-| **Groq / OpenRouter / DeepSeek** | API'den çekilir ("Modelleri Listele") |
-| **Ollama / LM Studio / llama.cpp** | Yerel sunucudan otomatik taranır |
-
-> 💡 **Önemli:** Model adları sağlayıcılar tarafından sık değiştirilir. Liste gelmezse **kendi sağlayıcınızın güncel model adını** sağlayıcının konsolundan kopyalayıp arayüzdeki model alanına girin. Planner ve Coder aşamaları için ayrı model seçmek üzere `.env` içindeki `AICAD_PLANNER_MODEL` / `AICAD_CODER_MODEL` anahtarlarını veya Ayarlar → 🏭 Üretim Hattı bölümünü kullanın.
+TR: "Mevcut gövdenin üst yüzeyine 4 adet M8 montaj deliği aç"
+EN: "Cut 4 M8 mounting holes on the top face of the current body"
+```
 
 ---
 
-## 🔧 Self-Healing CAD
+## 🧪 Testleri Çalıştırma
 
-Kod çalışma hatası verdiğinde sistem otomatik olarak:
-1. Hata mesajını yakalar
-2. Fusion 360 tasarım durumunu okur
-3. Hatayı AI modeline gönderir
-4. Düzeltilmiş kodu alır ve yeniden çalıştırır
+Projede SolidWorks COM adaptörü, 9 SolidWorks snippet'i, 4 Adam-CAD parametrik şablonu, Planner/Coder üretim hattı ve yapılandırma modüllerini doğrulayan **55 adet birim testi** bulunur:
+
+```powershell
+py -m pytest -v
+```
 
 ---
 
-## 👤 Yazar / Author
+## ❓ Sorun Giderme (Troubleshooting)
 
-**Yunus Ayyıldız** — [@yunusayyldz](https://github.com/yunusayyldz)
+1. **"SolidWorks Köprüsü Aranıyor / Bağlanılamadı" uyarısı alıyorum:**
+   - Klasördeki `baslat_solidworks.bat` dosyasının (veya `py solidworks_server.py` komutunun) arka planda açık olduğundan emin olun.
+   - SolidWorks'ün açık olduğunu kontrol edin.
+2. **SolidWorks açık ama çizim yapılmıyor:**
+   - SolidWorks içinde açık bir iletişim kutusu (ör. "Değişiklikleri kaydet?", özellik penceresi veya aktif bir komut) varsa ESC tuşuna basarak kapatın; açık modal pencereler COM API komutlarını bekletebilir.
+3. **`win32com` hatası alıyorum:**
+   - Terminalde `py -m pip install pywin32` komutunu çalıştırıp sunucuyu yeniden başlatın.
 
 ---
 
 ## 📄 Lisans / License
 
-MIT License — Copyright (c) 2026 Yunus Ayyıldız
-
----
-
-<p align="center">Made with ❤️ for the Fusion 360 community | Powered by AI</p>
+MIT License — Orijinal Proje: [Yunus Ayyıldız](https://github.com/yunusayyldz) | SolidWorks & Adam-CAD Entegrasyonu: `solidworks-adacad` branch.

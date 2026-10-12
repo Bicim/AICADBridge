@@ -160,6 +160,60 @@ class TestSolidWorksAdapterAndPipeline(unittest.TestCase):
         sys_p = llm_prompt.get_system_prompt('solidworks')
         self.assertIn('SolidWorks', sys_p)
 
+    def test_all_solidworks_snippets_and_presets_execute(self):
+        fake_model = FakeModelDoc()
+        fake_app = MagicMock()
+        fake_app.ActiveDoc = fake_model
+
+        def add_body_on_extrude(*args, **kwargs):
+            new_b = FakeBody(f'Boss-Extrude{len(fake_model.bodies) + 1}')
+            fake_model.bodies.append(new_b)
+            return MagicMock(Name=new_b.Name)
+
+        fake_model.FeatureManager.FeatureExtrusion3.side_effect = add_body_on_extrude
+        fake_model.FeatureManager.FeatureExtrusion2.side_effect = add_body_on_extrude
+
+        with patch.object(solidworks, 'get_sw_app', return_value=fake_app):
+            # 1) Tüm SolidWorks snippet dosyalarını tek tek çalıştır
+            sw_snips = snippet_loader.find_snippets(include_code=True, cad_target='solidworks')
+            self.assertEqual(len(sw_snips), 9)
+            for snip in sw_snips:
+                res = solidworks.execute_code(snip['code'])
+                self.assertTrue(res['success'], f"Snippet başarısız ({snip['id']}): {res.get('error')}")
+
+            # 2) UI içindeki 4 Adam-CAD hazır parametrik şablonu çalıştır
+            presets = [
+                # flange
+                """sw.reset_part()
+sw.extrude_cylinder(120, 14, plane='Top', merge=False)
+sw.extrude_cylinder(58, 14 + 22, plane='Top', merge=True)
+sw.cut_hole(32, 14 + 22 + 10, plane='Top')
+sw.cut_bolt_circle(90, 10, int(6), 14 + 5, plane='Top')
+sw.rebuild()""",
+                # bracket
+                """sw.reset_part()
+sw.extrude_box(70, 95, 12, cx_mm=0, cy_mm=95/2.0, plane='Top', merge=False)
+sw.extrude_box(70, 12, 80, cx_mm=0, cy_mm=12/2.0, plane='Top', merge=True)
+sw.cut_hole(10, 12 + 10, x_mm=-70/4.0, y_mm=95*0.65, plane='Top')
+sw.cut_hole(10, 12 + 10, x_mm=70/4.0, y_mm=95*0.65, plane='Top')
+sw.rebuild()""",
+                # gear
+                """sw.reset_part()
+sw.extrude_cylinder(110, 20, plane='Top', merge=False)
+sw.extrude_polygon(int(6), 46, 20 + 10, plane='Top', merge=True)
+sw.cut_hole(22, 20 + 10 + 10, plane='Top')
+sw.cut_bolt_circle(76, 14, int(6), 20 + 5, plane='Top')
+sw.rebuild()""",
+                # enclosure
+                """sw.reset_part()
+sw.extrude_box(110, 75, 45, plane='Top', merge=False)
+sw.cut_box(110 - 2*4, 75 - 2*4, 45 - 4, plane='Top')
+sw.rebuild()""",
+            ]
+            for idx, p_code in enumerate(presets):
+                res = solidworks.execute_code(p_code)
+                self.assertTrue(res['success'], f"Preset #{idx} başarısız: {res.get('error')}")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -391,8 +391,12 @@ class SolidWorksCADHelper:
                     aicad_log(f"[SolidWorks] {method_name} hatası: {e}")
         return None
 
-    def extrude_cylinder(self, diameter_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', merge=True, midplane=False):
+    def extrude_cylinder(self, diameter_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', merge=True, midplane=False, cx_mm=None, cy_mm=None):
         """Belirtilen düzlemde (varsayılan Top/Üst) silindir katılar."""
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
         r_m = self.mm(diameter_mm) / 2.0
         h_m = self.mm(height_mm)
         cx_m = self.mm(x_mm)
@@ -406,8 +410,12 @@ class SolidWorksCADHelper:
         self.operations_log.append(f"extrude_cylinder(d={diameter_mm}mm, h={height_mm}mm)")
         return feat
 
-    def extrude_box(self, width_mm, length_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', centered=True, merge=True, midplane=False):
+    def extrude_box(self, width_mm, length_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', centered=True, merge=True, midplane=False, cx_mm=None, cy_mm=None):
         """Belirtilen düzlemde dikdörtgen prizma (kutu/plaka) katılar."""
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
         w_m = self.mm(width_mm)
         l_m = self.mm(length_mm)
         h_m = self.mm(height_mm)
@@ -425,8 +433,12 @@ class SolidWorksCADHelper:
         self.operations_log.append(f"extrude_box({width_mm}x{length_mm}x{height_mm}mm)")
         return feat
 
-    def extrude_polygon(self, sides, diameter_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', merge=True):
+    def extrude_polygon(self, sides, diameter_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='top', merge=True, cx_mm=None, cy_mm=None):
         """Çokgen (altıgen somun vb.) profil çizip katılar."""
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
         r_m = self.mm(diameter_mm) / 2.0
         h_m = self.mm(height_mm)
         cx_m = self.mm(x_mm)
@@ -451,8 +463,12 @@ class SolidWorksCADHelper:
         self.operations_log.append(f"extrude_polygon(sides={sides}, d={diameter_mm}mm, h={height_mm}mm)")
         return feat
 
-    def cut_hole(self, diameter_mm, depth_mm=None, x_mm=0.0, y_mm=0.0, plane='top', through_all=False):
+    def cut_hole(self, diameter_mm, depth_mm=None, x_mm=0.0, y_mm=0.0, plane='top', through_all=False, cx_mm=None, cy_mm=None):
         """Mevcut katı gövde üzerinde dairesel delik (Extruded Cut) açar."""
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
         r_m = self.mm(diameter_mm) / 2.0
         d_m = self.mm(depth_mm) if depth_mm is not None else None
         cx_m = self.mm(x_mm)
@@ -495,10 +511,22 @@ class SolidWorksCADHelper:
         except Exception as e:
             aicad_log(f"[SolidWorks] reset_part uyarısı: {e}")
 
-    def cut_bolt_circle(self, hole_diameter_mm, bolt_circle_diameter_mm, count, depth_mm=None, plane='top'):
-        """Flanş vb. parçalar üzerinde dairesel dizilimli (bolt circle) cıvata delikleri açar."""
-        r_hole_m = self.mm(hole_diameter_mm) / 2.0
-        r_pitch_m = self.mm(bolt_circle_diameter_mm) / 2.0
+    def cut_bolt_circle(self, hole_diameter_mm, bolt_circle_diameter_mm, count, depth_mm=None, x_mm=0.0, y_mm=0.0, plane='top', cx_mm=None, cy_mm=None):
+        """Flanş vb. parçalar üzerinde dairesel dizilimli (bolt circle) cıvata delikleri açar.
+        İlk iki argüman hangi sırayla verilirse verilsin (küçük olan delik çapı, büyük olan PCD) otomatik algılanır.
+        """
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
+        d1 = float(hole_diameter_mm)
+        d2 = float(bolt_circle_diameter_mm)
+        actual_hole_mm = min(d1, d2)
+        actual_pcd_mm = max(d1, d2)
+        r_hole_m = self.mm(actual_hole_mm) / 2.0
+        r_pitch_m = self.mm(actual_pcd_mm) / 2.0
+        cx_m = self.mm(x_mm)
+        cy_m = self.mm(y_mm)
         d_m = self.mm(depth_mm) if depth_mm is not None else None
         n = max(1, int(count))
 
@@ -506,18 +534,22 @@ class SolidWorksCADHelper:
         if self.sketch_mgr is not None:
             for i in range(n):
                 angle = 2.0 * math.pi * i / n
-                hx = r_pitch_m * math.cos(angle)
-                hy = r_pitch_m * math.sin(angle)
+                hx = cx_m + r_pitch_m * math.cos(angle)
+                hy = cy_m + r_pitch_m * math.sin(angle)
                 self.sketch_mgr.CreateCircleByRadius(hx, hy, 0.0, r_hole_m)
         feat = self._extrude_cut(depth_m=d_m, through_all=(depth_mm is None), flip_dir=False)
         if feat is None:
             feat = self._extrude_cut(depth_m=d_m, through_all=True, flip_dir=True)
         self.model.ClearSelection2(True)
-        self.operations_log.append(f"cut_bolt_circle(count={n}, d={hole_diameter_mm}mm, pcd={bolt_circle_diameter_mm}mm)")
+        self.operations_log.append(f"cut_bolt_circle(count={n}, d={actual_hole_mm}mm, pcd={actual_pcd_mm}mm)")
         return feat
 
-    def cut_box(self, width_mm, length_mm, depth_mm=None, x_mm=0.0, y_mm=0.0, plane='top', centered=True):
+    def cut_box(self, width_mm, length_mm, depth_mm=None, x_mm=0.0, y_mm=0.0, plane='top', centered=True, cx_mm=None, cy_mm=None):
         """Dikdörtgen cep / kanal / yuva kesmesi yapar."""
+        if cx_mm is not None:
+            x_mm = cx_mm
+        if cy_mm is not None:
+            y_mm = cy_mm
         w_m = self.mm(width_mm)
         l_m = self.mm(length_mm)
         d_m = self.mm(depth_mm) if depth_mm is not None else None
@@ -595,7 +627,7 @@ class SolidWorksCADHelper:
         self.operations_log.append(f"chamfer_edges(d={distance_mm}mm)")
         return feat
 
-    def shell_body(self, wall_thickness_mm):
+    def shell_body(self, wall_thickness_mm, remove_top_face=True):
         """En üst düzlemsel yüzü seçip gövdenin içini boşaltır (Shell)."""
         t_m = self.mm(wall_thickness_mm)
         self.model.ClearSelection2(True)
@@ -604,7 +636,7 @@ class SolidWorksCADHelper:
             try:
                 faces = bodies[0].GetFaces
                 faces = faces() if callable(faces) else faces
-                if faces:
+                if faces and remove_top_face:
                     sel_fn = getattr(faces[0], 'Select4', None) or getattr(faces[0], 'Select2', None)
                     if callable(sel_fn):
                         sel_fn(False, None)
