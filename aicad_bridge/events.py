@@ -1,20 +1,29 @@
-"""Fusion ana thread'i ile arka plan thread'leri arasındaki görev köprüsü."""
+"""Fusion ana thread'i / SolidWorks COM oturumu ile arka plan thread'leri arasındaki görev köprüsü."""
 
 import json
 import threading
 import time
 import traceback
 
-import adsk.core
+try:
+    import adsk.core
+    _BASE_HANDLER = adsk.core.CustomEventHandler
+except ImportError:
+    adsk = None
+    _BASE_HANDLER = object
 
-from aicad_bridge import runtime
-from aicad_bridge.adapters import fusion360
+from aicad_bridge import adapters, runtime
 from aicad_bridge.messaging import get_active_palette
 from aicad_bridge.runtime import CUSTOM_EVENT_ID, aicad_log
 
 
-def get_design_state_on_main_thread():
-    """Fusion ana thread'inde aktif tasarımı analiz edip sonucunu bekler."""
+def get_design_state_on_main_thread(cad_target=None):
+    """Aktif CAD hedefinde (Fusion 360 veya SolidWorks) tasarımı analiz edip sonucunu döndürür."""
+    target = adapters.get_active_cad_target(cad_target)
+    if target == 'solidworks':
+        return adapters.get_adapter('solidworks').inspect_current_design()
+
+    from aicad_bridge.adapters import fusion360
     if not runtime.app or not runtime.custom_event:
         return fusion360.inspect_current_design()
     task_id = str(time.time())
@@ -34,8 +43,16 @@ def get_design_state_on_main_thread():
     return task_data['result']
 
 
-def run_code_on_main_thread(code):
-    """Fusion ana thread'inde Python kodunu çalıştırır ve sonucunu bekler."""
+def run_code_on_main_thread(code, cad_target=None):
+    """Aktif CAD hedefinde (Fusion 360 veya SolidWorks) Python kodunu çalıştırır ve sonucunu döndürür."""
+    target = adapters.get_active_cad_target(cad_target)
+    if target == 'solidworks':
+        return adapters.get_adapter('solidworks').execute_code(code)
+
+    from aicad_bridge.adapters import fusion360
+    if not runtime.app or not runtime.custom_event:
+        return fusion360.execute_code(code)
+
     task_id = str(time.time())
     evt = threading.Event()
     task = {'event': evt, 'result': None}
@@ -54,8 +71,13 @@ def run_code_on_main_thread(code):
     return task_data['result']
 
 
-def capture_viewport_on_main_thread(width=900, height=600):
-    """Fusion ana thread'inde viewport ekran görüntüsü alıp sonucunu bekler."""
+def capture_viewport_on_main_thread(width=900, height=600, cad_target=None):
+    """Aktif CAD hedefinde viewport ekran görüntüsü alıp sonucunu döndürür."""
+    target = adapters.get_active_cad_target(cad_target)
+    if target == 'solidworks':
+        return adapters.get_adapter('solidworks').capture_viewport_image(width, height)
+
+    from aicad_bridge.adapters import fusion360
     if not runtime.app or not runtime.custom_event:
         return fusion360.capture_viewport_image(width, height)
     task_id = str(time.time())
@@ -75,10 +97,11 @@ def capture_viewport_on_main_thread(width=900, height=600):
     return task_data['result']
 
 
-class CustomEventHandler(adsk.core.CustomEventHandler):
+class CustomEventHandler(_BASE_HANDLER):
     """Arka plan thread'lerinden gelen komutları Fusion ana thread'inde yürütür."""
     def notify(self, args):
         try:
+            from aicad_bridge.adapters import fusion360
             event_args = adsk.core.CustomEventArgs.cast(args)
             payload = json.loads(event_args.additionalInfo)
             act = payload.get('action')

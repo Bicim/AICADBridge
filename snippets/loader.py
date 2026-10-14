@@ -1,4 +1,4 @@
-"""Snippets dizini (index.json) uzerinden Fusion 360 snippet kodlarini yukler.
+"""Snippets dizini (index.json) uzerinden Fusion 360 ve SolidWorks snippet kodlarini yukler.
 
 Sadece standart kutuphane kullanir (json, os). Fusion 360 veya aicad_bridge
 paketlerine bagimliligi yoktur; hem add-in icinden hem harici araclardan
@@ -7,15 +7,10 @@ kullanilabilir.
 Kullanim:
     from snippets import loader
 
-    loader.get_snippet('fillet_edges')                 # id ile tek snippet kodu
-    loader.find_snippets(feature_type='pattern')       # feature_type'a gore ara
-    loader.find_snippets(keyword='yuvarlat')           # anahtar kelimeye gore ara
-    loader.get_snippet_codes(feature_type='extrude')   # (id, kod) listesi
-
-Not: Anahtar kelime aramasi, index'teki TR/EN anahtar kelimelerin yaninda id ve
-feature_type alanlarinda da alt dizgi olarak calisir (buyuk/kucuk harf duyarsiz).
-Turkce karakterler (c, g, i, o, s, u) katlanarak ASCII karsiliklarina cevrilir;
-boylece "cember" ve "çember" gibi yazimlarin ikisi de eslesir.
+    loader.get_snippet('fillet_edges')                                    # Fusion 360
+    loader.find_snippets(feature_type='extrude', cad_target='solidworks') # SolidWorks
+    loader.find_snippets(keyword='yuvarlat')                              # anahtar kelimeye gore ara
+    loader.get_snippet_codes(feature_type='extrude')                      # (id, kod) listesi
 """
 
 import json
@@ -23,6 +18,7 @@ import os
 
 _SNIPPETS_DIR = os.path.dirname(os.path.abspath(__file__))
 _INDEX_PATH = os.path.join(_SNIPPETS_DIR, 'index.json')
+_SW_INDEX_PATH = os.path.join(_SNIPPETS_DIR, 'solidworks', 'index.json')
 _REPO_ROOT = os.path.dirname(_SNIPPETS_DIR)
 
 # Turkce karakterlerin ASCII karsiliklari (arama icin)
@@ -34,9 +30,14 @@ def _fold(text):
     return str(text).lower().translate(_TR_FOLD)
 
 
-def load_index():
+def _is_sw(cad_target):
+    return str(cad_target or '').strip().lower() in ('solidworks', 'sw', 'adacad', 'adamcad', 'cadam')
+
+
+def load_index(cad_target='fusion360'):
     """index.json dosyasini okuyup sozluk olarak dondurur."""
-    with open(_INDEX_PATH, 'r', encoding='utf-8') as f:
+    path = _SW_INDEX_PATH if (_is_sw(cad_target) and os.path.isfile(_SW_INDEX_PATH)) else _INDEX_PATH
+    with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -84,20 +85,10 @@ def get_snippet_code(entry):
         return f.read()
 
 
-def find_snippets(feature_type=None, keyword=None, include_code=False):
-    """Filtrelere uyan snippet kayitlarini dondurur.
-
-    Parametreler:
-        feature_type: index'teki feature_type alaniyla birebir eslesir
-                      (buyuk/kucuk harf duyarsiz).
-        keyword:      TR/EN anahtar kelimelerde, id ve feature_type'ta
-                      alt dizgi olarak aranir (buyuk/kucuk harf duyarsiz).
-        include_code: True ise her kayda 'code' alani eklenir.
-
-    Iki filtre birden verilirse ikisini de saglayan kayitlar doner.
-    """
+def find_snippets(feature_type=None, keyword=None, include_code=False, cad_target='fusion360'):
+    """Filtrelere uyan snippet kayitlarini dondurur."""
     results = []
-    for entry in load_index().get('snippets', []):
+    for entry in load_index(cad_target=cad_target).get('snippets', []):
         if _matches(entry, feature_type, keyword):
             item = dict(entry)
             if include_code:
@@ -106,21 +97,18 @@ def find_snippets(feature_type=None, keyword=None, include_code=False):
     return results
 
 
-def get_snippet(snippet_id):
+def get_snippet(snippet_id, cad_target='fusion360'):
     """id ile eslesen snippet'in kod metnini dondurur (bulamazsa None)."""
-    for entry in load_index().get('snippets', []):
+    for entry in load_index(cad_target=cad_target).get('snippets', []):
         if entry.get('id', '').lower() == str(snippet_id).lower():
             return get_snippet_code(entry)
     return None
 
 
-def get_snippet_codes(feature_type=None, keyword=None):
-    """Filtrelere uyan snippet'lerin (id, kod) listesini dondurur.
-
-    Dosyasi okunamayan kayitlar sessizce atlanir.
-    """
+def get_snippet_codes(feature_type=None, keyword=None, cad_target='fusion360'):
+    """Filtrelere uyan snippet'lerin (id, kod) listesini dondurur."""
     codes = []
-    for entry in find_snippets(feature_type=feature_type, keyword=keyword):
+    for entry in find_snippets(feature_type=feature_type, keyword=keyword, cad_target=cad_target):
         code = get_snippet_code(entry)
         if code is not None:
             codes.append((entry.get('id'), code))

@@ -130,6 +130,30 @@ CRITICAL RULES:
 - STRICT BAN: ui.messageBox(...), try/except that swallows errors. Let exceptions raise so the Self-Healing system can repair them.
 """
 
+SOLIDWORKS_CODER_PROMPT = """You are the CODER module of "AI CAD Studio (SolidWorks · Adam-CAD Edition)" for SolidWorks.
+You write ONE self-contained SolidWorks Python script that implements ONE feature of a larger plan.
+
+OUTPUT: ONLY a single ```python ... ``` code block. Nothing else.
+CRITICAL RULES:
+- DO NOT import adsk.core or adsk.fusion! This is SolidWorks, NOT Fusion 360.
+- The helper object `sw` (and `cad`) plus raw COM objects (`swApp`, `swModel`, `featMgr`, `sketchMgr`, `math`) are ALREADY injected into the global execution scope.
+- Use `sw` helper methods where ALL dimensions are in MILLIMETERS (mm):
+  * `sw.define_parameter(name, value_mm)`
+  * `sw.extrude_cylinder(diameter_mm, height_mm, x_mm=0, y_mm=0, plane='top')`
+  * `sw.extrude_box(width_mm, length_mm, height_mm, x_mm=0, y_mm=0, plane='top', centered=True)`
+  * `sw.extrude_polygon(sides, diameter_mm, height_mm, x_mm=0, y_mm=0, plane='top')`
+  * `sw.cut_hole(diameter_mm, depth_mm=None, x_mm=0, y_mm=0, plane='top', through_all=True)`
+  * `sw.cut_bolt_circle(hole_diameter_mm, bolt_circle_diameter_mm, count, depth_mm=None, plane='top')`
+  * `sw.cut_box(width_mm, length_mm, depth_mm=None, x_mm=0, y_mm=0, plane='top')`
+  * `sw.fillet_edges(radius_mm)`
+  * `sw.chamfer_edges(distance_mm, angle_deg=45)`
+  * `sw.shell_body(wall_thickness_mm)`
+  * `sw.revolve_profile(points_mm=[(0,0), (r1,0), (r2,h), (0,h)], angle_deg=360, plane='front')`
+  * `sw.rebuild()`
+- If using raw COM (`sketchMgr` / `featMgr`), remember SolidWorks internal units are METERS (`mm / 1000.0`).
+- STRICT BAN: Never swallow exceptions with try/except pass.
+"""
+
 
 # --------------------------------------------------------------------------
 # Plan JSON çözümleme ve doğrulama
@@ -286,12 +310,20 @@ def is_simple_command(prompt):
 # --------------------------------------------------------------------------
 # Coder prompt kurma (few-shot snippet seçimi dahil)
 # --------------------------------------------------------------------------
-def _select_snippets(feature, limit=2):
+def _is_sw(cad_target):
+    return str(cad_target or '').strip().lower() in ('solidworks', 'sw', 'adacad', 'adamcad', 'cadam')
+
+
+def _select_snippets(feature, limit=2, cad_target='fusion360'):
     """Feature türüne/anhtar kelimelerine uyan örnek snippet kodlarını döndürür."""
     if _SNIPPETS is None:
         return []
     entries = []
     try:
+        entries = _SNIPPETS.find_snippets(
+            feature_type=feature.get('type', ''), include_code=True, cad_target=cad_target
+        ) or []
+    except TypeError:
         entries = _SNIPPETS.find_snippets(feature_type=feature.get('type', ''), include_code=True) or []
     except Exception:
         entries = []
@@ -300,6 +332,10 @@ def _select_snippets(feature, limit=2):
         for word in re.split(r'[\s,;.]+', desc)[:4]:
             if len(word) >= 4:
                 try:
+                    entries = _SNIPPETS.find_snippets(
+                        keyword=word, include_code=True, cad_target=cad_target
+                    ) or []
+                except TypeError:
                     entries = _SNIPPETS.find_snippets(keyword=word, include_code=True) or []
                 except Exception:
                     entries = []
@@ -313,11 +349,15 @@ def _select_snippets(feature, limit=2):
     return out
 
 
-def build_coder_prompt(plan, feature, prev_summaries=None, context_summary=None):
+def build_coder_prompt(plan, feature, prev_summaries=None, context_summary=None, cad_target='fusion360'):
     """Bir feature için Coder (system, user) promptunu kurar."""
-    snippets = _select_snippets(feature)
+    sw_mode = _is_sw(cad_target)
+    snippets = _select_snippets(feature, cad_target=cad_target)
     parts = []
-    parts.append('[GÖREV] Aşağıdaki planın SADECE belirtilen unsuru için Fusion 360 Python kodu yaz.')
+    if sw_mode:
+        parts.append('[GÖREV] Aşağıdaki planın SADECE belirtilen unsuru için SolidWorks (Adam-CAD `sw` helper) Python kodu yaz.')
+    else:
+        parts.append('[GÖREV] Aşağıdaki planın SADECE belirtilen unsuru için Fusion 360 Python kodu yaz.')
     parts.append('[PLAN PARAMETRELERİ]: ' + json.dumps(plan.get('parameters', []), ensure_ascii=False))
     parts.append('[PLANIN TAMAMI]: ' + json.dumps({'features': plan.get('features', [])}, ensure_ascii=False))
     parts.append('[SIRADAKİ UNSUR]: ' + json.dumps(feature, ensure_ascii=False))
@@ -327,16 +367,23 @@ def build_coder_prompt(plan, feature, prev_summaries=None, context_summary=None)
         parts.append('[MEVCUT TASARIM DURUMU]:\n' + str(context_summary))
     if snippets:
         parts.append('[REFERANS ÖRNEK KODLAR — aynı API kalıplarını kullan]:\n' + '\n\n'.join(snippets))
-    parts.append("[KURALLAR]: mm değerlerini /10 ile cm'ye çevir; yeni katı için NewBodyFeatureOperation; "
-                 "planda parametre varsa userParameters.add ile tanımla ve kullan; delik/yuvarlatma/pah için "
-                 "gerçek Fusion özelliklerini (holeFeatures/filletFeatures/chamferFeatures) tercih et; "
-                 "ui.messageBox ve hata yutan try/except YASAK.")
+    if sw_mode:
+        parts.append("[KURALLAR]: adsk.core / adsk.fusion KESİNLİKLE İMPORT ETME; "
+                     "doğrudan global `sw` yardımcısını (`sw.extrude_cylinder`, `sw.extrude_box`, `sw.cut_hole`, "
+                     "`sw.cut_bolt_circle`, `sw.cut_box`, `sw.fillet_edges`, `sw.chamfer_edges`, `sw.shell_body`, "
+                     "`sw.revolve_profile`, `sw.rebuild`) milimetre (mm) ölçüleriyle kullan; hata yutan try/except YASAK.")
+    else:
+        parts.append("[KURALLAR]: mm değerlerini /10 ile cm'ye çevir; yeni katı için NewBodyFeatureOperation; "
+                     "planda parametre varsa userParameters.add ile tanımla ve kullan; delik/yuvarlatma/pah için "
+                     "gerçek Fusion özelliklerini (holeFeatures/filletFeatures/chamferFeatures) tercih et; "
+                     "ui.messageBox ve hata yutan try/except YASAK.")
     parts.append('SADECE ```python ... ``` bloğu içinde eksiksiz, çalışan kodu döndür.')
-    return {'system': CODER_PROMPT, 'user': '\n\n'.join(parts)}
+    return {'system': SOLIDWORKS_CODER_PROMPT if sw_mode else CODER_PROMPT, 'user': '\n\n'.join(parts)}
 
 
-def build_correction_prompt(plan, feature, issues, current_code='', prev_summaries=None, context_summary=None):
+def build_correction_prompt(plan, feature, issues, current_code='', prev_summaries=None, context_summary=None, cad_target='fusion360'):
     """Doğrulama uyuşmazlığını açıklayan mesajla Coder düzeltme turu promptunu kurar."""
+    sw_mode = _is_sw(cad_target)
     issue_lines = []
     for it in issues:
         issue_lines.append(it.get('text', '') if isinstance(it, dict) else str(it))
@@ -352,7 +399,7 @@ def build_correction_prompt(plan, feature, issues, current_code='', prev_summari
     if current_code:
         parts.append('[MEVCUT KOD (bunu düzelt)]:\n```python\n' + current_code + '\n```')
     parts.append('SADECE ```python ... ``` bloğu içinde düzeltilmiş, eksiksiz kodu döndür.')
-    return {'system': CODER_PROMPT, 'user': '\n\n'.join(parts)}
+    return {'system': SOLIDWORKS_CODER_PROMPT if sw_mode else CODER_PROMPT, 'user': '\n\n'.join(parts)}
 
 
 # --------------------------------------------------------------------------
@@ -475,6 +522,7 @@ def run_pipeline_helper(payload, inspect_state=None, capture_viewport=None):
     if not isinstance(payload, dict):
         return {'ok': False, 'error': 'Geçersiz istek.'}
     op = payload.get('op')
+    cad_target = payload.get('cad_target') or 'fusion360'
     try:
         if op == 'simpleCheck':
             plan = is_simple_command(payload.get('prompt', ''))
@@ -495,7 +543,8 @@ def run_pipeline_helper(payload, inspect_state=None, capture_viewport=None):
         if op == 'coderPrompt':
             res = build_coder_prompt(payload.get('plan') or {}, payload.get('feature') or {},
                                      payload.get('prev_summaries') or [],
-                                     payload.get('context_summary'))
+                                     payload.get('context_summary'),
+                                     cad_target=cad_target)
             res['ok'] = True
             return res
 
@@ -503,7 +552,8 @@ def run_pipeline_helper(payload, inspect_state=None, capture_viewport=None):
             res = build_correction_prompt(payload.get('plan') or {}, payload.get('feature') or {},
                                           payload.get('issues') or [], payload.get('current_code', ''),
                                           payload.get('prev_summaries') or [],
-                                          payload.get('context_summary'))
+                                          payload.get('context_summary'),
+                                          cad_target=cad_target)
             res['ok'] = True
             return res
 

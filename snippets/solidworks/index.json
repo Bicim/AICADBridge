@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "description": "AICADBridge SolidWorks (COM API + Adam-CAD sw helper) snippet kütüphanesi dizini.",
+  "snippets": [
+    {
+      "id": "sw_sketch_circle_extrude",
+      "feature_type": "extrude",
+      "keywords": {
+        "tr": ["daire", "çember", "silindir", "boru", "mil", "tekerlek", "yuvarlak", "uzatma", "ekstrüzyon"],
+        "en": ["circle", "cylinder", "tube", "shaft", "wheel", "round", "extrude", "boss"]
+      },
+      "file": "snippets/solidworks/sketch_circle_extrude.py"
+    },
+    {
+      "id": "sw_sketch_rectangle_extrude",
+      "feature_type": "extrude",
+      "keywords": {
+        "tr": ["dikdörtgen", "kare", "kutu", "plaka", "tabla", "prizma", "blok", "uzatma"],
+        "en": ["rectangle", "square", "box", "plate", "prism", "block", "extrude"]
+      },
+      "file": "snippets/solidworks/sketch_rectangle_extrude.py"
+    },
+    {
+      "id": "sw_extrude_cut",
+      "feature_type": "cut",
+      "keywords": {
+        "tr": ["kesme", "kesit", "yuva", "oluk", "kanal", "cep", "pocket", "boşluk"],
+        "en": ["cut", "pocket", "slot", "groove", "channel", "remove material"]
+      },
+      "file": "snippets/solidworks/extrude_cut.py"
+    },
+    {
+      "id": "sw_hole_feature",
+      "feature_type": "hole",
+      "keywords": {
+        "tr": ["delik", "matkap", "cıvata deliği", "geçme deliği", "montaj deliği"],
+        "en": ["hole", "drill", "bore", "bolt hole", "through hole"]
+      },
+      "file": "snippets/solidworks/hole_feature.py"
+    },
+    {
+      "id": "sw_fillet_edges",
+      "feature_type": "fillet",
+      "keywords": {
+        "tr": ["yuvarlatma", "yuvarlat", "radius", "radyüs", "kenar yumuşatma"],
+        "en": ["fillet", "round", "radius", "edge rounding"]
+      },
+      "file": "snippets/solidworks/fillet_edges.py"
+    },
+    {
+      "id": "sw_chamfer_edges",
+      "feature_type": "chamfer",
+      "keywords": {
+        "tr": ["pah", "pah kır", "kenar kır", "eğik kenar"],
+        "en": ["chamfer", "bevel", "edge break"]
+      },
+      "file": "snippets/solidworks/chamfer_edges.py"
+    },
+    {
+      "id": "sw_circular_pattern",
+      "feature_type": "pattern",
+      "keywords": {
+        "tr": ["dairesel desen", "desen", "çoğaltma", "bolt circle", "tekrar", "dizilim"],
+        "en": ["circular pattern", "radial pattern", "array", "bolt circle", "repeat"]
+      },
+      "file": "snippets/solidworks/circular_pattern.py"
+    },
+    {
+      "id": "sw_shell_body",
+      "feature_type": "shell",
+      "keywords": {
+        "tr": ["kabuk", "içi boş", "ince cidar", "hollow", "içini oy"],
+        "en": ["shell", "hollow", "thin wall", "wall thickness"]
+      },
+      "file": "snippets/solidworks/shell_body.py"
+    },
+    {
+      "id": "sw_revolve_profile",
+      "feature_type": "revolve",
+      "keywords": {
+        "tr": ["döndürme", "döndür", "torna", "simetrik gövde", "halka", "koni", "huni"],
+        "en": ["revolve", "rotate", "lathe", "axisymmetric", "ring", "cone"]
+      },
+      "file": "snippets/solidworks/revolve_profile.py"
+    }
+  ]
+}

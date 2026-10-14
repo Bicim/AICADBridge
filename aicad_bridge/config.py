@@ -33,6 +33,8 @@ DEFAULTS = {
     # yedek model listesi: virgülle ayrılmış model id'leri. Boş = liste yok,
     # kullanıcı model adını arayüzden elle girer.
     'AICAD_ANTHROPIC_MODELS': '',
+    # Hedef CAD motoru: 'fusion360' veya 'solidworks'
+    'AICAD_CAD_TARGET': 'fusion360',
 }
 
 _cache = {}
@@ -99,6 +101,7 @@ def get_settings(refresh=False):
         'max_tokens': _get_int('AICAD_MAX_TOKENS', 16384),
         'vision_max_tokens': _get_int('AICAD_VISION_MAX_TOKENS', 4096),
         'anthropic_models': [m.strip() for m in str(_get('AICAD_ANTHROPIC_MODELS')).split(',') if m.strip()],
+        'cad_target': str(_get('AICAD_CAD_TARGET')).strip().lower() or 'fusion360',
     }
     _cache['settings'] = settings
     return settings

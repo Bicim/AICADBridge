@@ -827,6 +827,11 @@
           <span class="brand-name">AI CAD Studio</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <!-- CAD Target Switcher (Fusion 360 <-> SolidWorks / Adam-CAD) -->
+          <button id="btnCadTarget" onclick="toggleCadTarget()" title="Hedef CAD Programını Değiştir (SolidWorks / Fusion 360)" style="background:rgba(239,68,68,0.14);border:1px solid rgba(239,68,68,0.45);color:#fca5a5;cursor:pointer;padding:5px 10px;border-radius:8px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;transition:all .15s;font-family:var(--font);">
+            <span id="cadTargetIcon">🟥</span>
+            <span id="cadTargetLabel">SolidWorks</span>
+          </button>
           <!-- Thinking Mode Toggle (topbar) -->
           <button id="btnThinking" onclick="toggleThinking()" title="Derin Düşünce Modu (Claude/Gemini)" style="background:transparent;border:1px solid transparent;color:#888;cursor:pointer;padding:5px 10px;border-radius:8px;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;transition:all .15s;font-family:var(--font);" onmouseover="this.style.color='#fff'" onmouseout="if(!thinkingMode)this.style.color='#888'">
             <span style="font-size:14px;">🧠</span>
@@ -836,9 +841,9 @@
             <span style="font-size:14px;">👁️</span>
             <span id="visionVerifyLabel">Görsel Doğrulama</span>
           </button>
-          <button id="btnConnectPill" class="btn-connect-pill disconnected" onclick="openConnectModal()" title="Fusion 360 Bağlantı Durumu">
+          <button id="btnConnectPill" class="btn-connect-pill disconnected" onclick="openConnectModal()" title="CAD Bağlantı Durumu">
             <span class="status-dot"></span>
-            <span class="status-text" id="connectPillText">Fusion'a Bağlan</span>
+            <span class="status-text" id="connectPillText">CAD'e Bağlan</span>
           </button>
           <button onclick="startNewChat()" title="Yeni Sohbet Başlat" style="background:transparent;border:none;color:#888;cursor:pointer;padding:6px;border-radius:6px;display:flex;align-items:center;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -851,7 +856,7 @@
 
       <!-- External browser warning banner -->
       <div id="fusionNoticeBanner" style="display:none;background:#241604;border-bottom:1px solid #d97706;padding:9px 16px;font-size:12px;color:#fcd34d;line-height:1.45;">
-        ⚠️ <b>Fusion 360 Bağlantısı:</b> Çizilen modellerin Fusion 360 ekranına gelmesi için Fusion'ı açıp eklentiyi çalıştırın. <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:6px;">Fusion'a Nasıl Bağlanılır? &rarr;</a>
+        ⚠️ <b>CAD Bağlantısı:</b> Çizilen modellerin ekrana gelmesi için köprü sunucusunu (`baslat_solidworks.bat` veya Fusion eklentisi) çalıştırın. <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:6px;">Nasıl Bağlanılır? &rarr;</a>
       </div>
 
       <!-- View Mode Tabs -->
@@ -862,7 +867,7 @@
         </button>
         <button class="view-tab" id="tabParam" onclick="switchView('param')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-          Parametrik
+          Parametrik (Adam-CAD)
         </button>
       </div>
 
@@ -871,12 +876,12 @@
         <div class="chat-area" id="chatArea">
           <div class="welcome" id="welcomeScreen">
             <div class="welcome-greeting" id="greetingText">İyi günler, Yunus!</div>
-            <div class="welcome-sub">Fusion 360'ta serbestçe fikir danışabilir, referans görsel veya eskiz/dosya (DXF, SVG, TXT) yükleyebilir ya da doğrudan 3D model tasarlatabilirsin.</div>
+            <div class="welcome-sub" id="welcomeSubText">SolidWorks veya Fusion 360'ta serbestçe fikir danışabilir, referans görsel/dosya (DXF, SVG, TXT) yükleyebilir ya da doğrudan 3D model tasarlatabilirsin.</div>
             <div class="quick-actions">
-              <div class="quick-chip" onclick="sendQuick('Uçak oluşturmak istiyorum bu uçağın tasarımını nasıl yapalım sence?')">✈️ Uçak Tasarımı Danış</div>
+              <div class="quick-chip" onclick="sendQuick('100mm çapında, 15mm kalınlığında, merkezinde 30mm delik ve etrafında 4 adet 8mm cıvata deliği olan bir flanş çiz')">⚙️ 4 Delikli Flanş</div>
               <div class="quick-chip" onclick="quickInspectDesign()">🔍 Mevcut Tasarımı İncele</div>
               <div class="quick-chip" onclick="sendQuick('50mm x 30mm x 20mm boyutlarında katı bir kutu oluştur')">📦 50x30x20mm Kutu</div>
-              <div class="quick-chip" onclick="sendQuick('Çapı 40mm, yüksekliği 60mm olan ve merkezinde 15mm delik bulunan bir silindir oluştur')">⚙️ Delikli Silindir</div>
+              <div class="quick-chip" onclick="sendQuick('Çapı 40mm, yüksekliği 60mm olan ve merkezinde 15mm delik bulunan bir silindir oluştur')">🔩 Delikli Silindir</div>
             </div>
           </div>
           <div class="messages" id="messagesContainer"></div>
@@ -928,10 +933,16 @@
       <div id="viewParam" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
         <div class="param-panel active" id="paramPanel">
           <div class="param-header">
-            <h3>⚙️ Parametrik Modelleme</h3>
-            <p>Doğal dilde parça tanımla, AI parametreli Fusion 360 kodu üretsin — sliderlarla anlık kontrol et.</p>
+            <h3>⚙️ Adam-CAD (CADAM) Canlı Parametrik Modelleme</h3>
+            <p id="paramHeaderSub">Doğal dilde parça tanımla veya hazır şablon seç — sliderlarla SolidWorks / Fusion 360'ta anlık kontrol et.</p>
           </div>
           <div class="param-content">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+              <button type="button" class="quick-chip" onclick="applyParamPreset('flange')">⚙️ Cıvata Delikli Flanş (Hazır)</button>
+              <button type="button" class="quick-chip" onclick="applyParamPreset('bushing')">🔩 Delikli Silindir / Burç (Hazır)</button>
+              <button type="button" class="quick-chip" onclick="applyParamPreset('plate')">📐 Yuvalı Montaj Plakası (Hazır)</button>
+              <button type="button" class="quick-chip" onclick="applyParamPreset('hexnut')">🔧 Altıgen Somun (Hazır)</button>
+            </div>
             <div class="param-input-row">
               <textarea id="paramPrompt" placeholder="Örn: Çapı 40mm, yüksekliği 60mm olan, merkezinde 15mm delik bulunan bir silindir oluştur" rows="3"></textarea>
               <button class="btn-param-gen" id="btnParamGen" onclick="generateParametric()">
@@ -945,7 +956,7 @@
             <div class="param-preview-area" id="paramPreview">
               <div style="text-align:center;">
                 <div style="font-size:32px;margin-bottom:8px;">⚙️</div>
-                <div>Parametrik bir parça tanımla, AI sliderlar oluştursun ve Fusion 360'ta anlık uygulansın.</div>
+                <div>Yukarıdaki hazır Adam-CAD şablonlarından birine tıkla veya parça tanımla; slider'ları kaydırdıkça CAD modelin anlık güncellensin.</div>
               </div>
             </div>
 
@@ -1268,7 +1279,15 @@
       { id:'local',      name:'Yerel Model (Local)', icon:'🖥️', iconBg:'#152936', category:'local',    badgeClass:'local',    tag:'Offline',   needsKey:false },
     ];
 
+    const _urlCadParam = new URLSearchParams(window.location.search).get('cad');
+    const _initialCadTarget = (_urlCadParam && /solidworks|sw|adacad|adam/i.test(_urlCadParam))
+      ? 'solidworks'
+      : ((_urlCadParam && /fusion/i.test(_urlCadParam))
+          ? 'fusion360'
+          : (localStorage.getItem('aicad_cad_target') || 'solidworks'));
+
     let state = {
+      cadTarget: _initialCadTarget,
       sourceMode: localStorage.getItem('aicad_source_mode') || 'cloud',
       provider: localStorage.getItem('aicad_provider') || 'ollama',
       model: localStorage.getItem('aicad_model') || '',
@@ -1283,6 +1302,46 @@
       isGenerating: false,
       connected: {},      // provider -> bool
     };
+
+    function isSolidWorksTarget() {
+      return state.cadTarget === 'solidworks';
+    }
+
+    function getCadLabel() {
+      return isSolidWorksTarget() ? 'SolidWorks' : 'Fusion 360';
+    }
+
+    function applyCadTargetUI() {
+      const btn = document.getElementById('btnCadTarget');
+      const label = document.getElementById('cadTargetText');
+      const isSw = isSolidWorksTarget();
+      if (label) label.textContent = isSw ? 'SolidWorks + Adam-CAD' : 'Fusion 360';
+      if (btn) {
+        btn.style.borderColor = isSw ? 'rgba(239,68,68,0.55)' : 'rgba(56,189,248,0.4)';
+        btn.style.background = isSw ? 'rgba(239,68,68,0.14)' : 'rgba(56,189,248,0.1)';
+        btn.style.color = isSw ? '#fca5a5' : '#38bdf8';
+      }
+      const paramInput = document.getElementById('paramPrompt');
+      if (paramInput) {
+        paramInput.placeholder = isSw
+          ? 'SolidWorks + Adam-CAD parametrik parça tarif edin (örn: 6 delikli mil flanşı, L braket...)'
+          : 'Parametrik parça tarif edin (örn: Silindirik kutu, dişli çark, masa ayağı...)';
+      }
+    }
+
+    async function toggleCadTarget() {
+      state.cadTarget = isSolidWorksTarget() ? 'fusion360' : 'solidworks';
+      localStorage.setItem('aicad_cad_target', state.cadTarget);
+      applyCadTargetUI();
+      try {
+        await fetch('http://127.0.0.1:49876/cad_target', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cad_target: state.cadTarget })
+        });
+      } catch(e) {}
+      checkBridgeStatus();
+    }
 
     // ── Fusion Bridge & Web Bridge State ──
     let bridgeState = {
@@ -1318,7 +1377,8 @@
     }
 
     function sendToFusion(action, data) {
-      const p = typeof data === 'string' ? data : JSON.stringify(data || {});
+      const payloadObj = typeof data === 'object' && data !== null ? { ...data, cad_target: state.cadTarget } : data;
+      const p = typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj || {});
       if (typeof adsk !== 'undefined' && adsk.fusionSendData) {
         adsk.fusionSendData(action, p).catch(e => console.error('[Fusion Send error]', e));
       } else {
@@ -1327,10 +1387,11 @@
     }
 
     async function sendToFusionAsync(action, data) {
-      const p = typeof data === 'string' ? data : JSON.stringify(data || {});
+      const payloadObj = typeof data === 'object' && data !== null ? { ...data, cad_target: state.cadTarget } : data;
+      const p = typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj || {});
 
-      // 1. Durum: Fusion 360 İç Paletinde Çalışıyor
-      if (typeof adsk !== 'undefined' && adsk.fusionSendData) {
+      // 1. Durum: Fusion 360 İç Paletinde Çalışıyor (ve hedef Fusion ise)
+      if (!isSolidWorksTarget() && typeof adsk !== 'undefined' && adsk.fusionSendData) {
         return new Promise((resolve, reject) => {
           adsk.fusionSendData(action, p).then(result => {
             try {
@@ -1346,13 +1407,13 @@
         });
       }
 
-      // 2. Durum: Harici Tarayıcı (Chrome / Edge) -> 127.0.0.1:49876 Yerel Web Köprüsü
+      // 2. Durum: Harici Tarayıcı (Chrome / Edge) veya SolidWorks COM Köprüsü -> 127.0.0.1:49876
       if (action === 'executeCADCode') {
         try {
           const res = await fetch('http://127.0.0.1:49876/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: data.code })
+            body: JSON.stringify({ code: data.code, cad_target: state.cadTarget })
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const jsonRes = await res.json();
@@ -1361,7 +1422,7 @@
           console.warn('[Web Köprüsü] İstek başarısız:', err);
           return {
             success: false,
-            error: 'Fusion 360 Yerel Web Köprüsüne bağlanılamadı (127.0.0.1:49876). Lütfen Fusion 360\'ı açıp eklentiyi çalıştırın.',
+            error: `${getCadLabel()} Yerel Web Köprüsüne bağlanılamadı (127.0.0.1:49876). Lütfen baslat_solidworks.bat (veya Fusion eklentisi) ile sunucuyu başlatın.`,
             devMode: true
           };
         }
@@ -1369,7 +1430,7 @@
 
       if (action === 'getDesignState' || action === 'inspectDesign') {
         try {
-          const res = await fetch('http://127.0.0.1:49876/design_state', { signal: AbortSignal.timeout(2500) });
+          const res = await fetch(`http://127.0.0.1:49876/design_state?cad_target=${encodeURIComponent(state.cadTarget)}`, { signal: AbortSignal.timeout(3000) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return await res.json();
         } catch(err) {
@@ -1383,7 +1444,7 @@
           const res = await fetch('http://127.0.0.1:49876/fetch_models', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data || {}),
+            body: JSON.stringify(payloadObj || {}),
             signal: AbortSignal.timeout(6000)
           });
           if (res.ok) return await res.json();
@@ -1431,17 +1492,18 @@
 
       return {
         success: false,
-        error: 'Bu işlem için aktif Fusion 360 oturumu gereklidir.',
+        error: `Bu işlem için aktif ${getCadLabel()} oturumu gereklidir.`,
         devMode: true
       };
     }
 
     async function checkBridgeStatus() {
-      const isInside = typeof adsk !== 'undefined' && Boolean(adsk.fusionSendData);
+      const isInside = !isSolidWorksTarget() && typeof adsk !== 'undefined' && Boolean(adsk.fusionSendData);
       const pill = document.getElementById('btnConnectPill');
       const pillText = document.getElementById('connectPillText');
       const banner = document.getElementById('fusionNoticeBanner');
       const modalStatus = document.getElementById('modalLiveBridgeStatus');
+      const cadName = getCadLabel();
 
       if (isInside) {
         bridgeState.isInsideFusion = true;
@@ -1464,18 +1526,20 @@
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 1500);
-        const res = await fetch('http://127.0.0.1:49876/health', { signal: ctrl.signal });
+        const res = await fetch(`http://127.0.0.1:49876/health?cad_target=${encodeURIComponent(state.cadTarget)}`, { signal: ctrl.signal });
         clearTimeout(tid);
         if (res.ok) {
+          const hData = await res.json().catch(() => ({}));
           bridgeState.isWebConnected = true;
+          const swReady = isSolidWorksTarget() ? (hData?.available?.solidworks !== false) : true;
           if (pill) {
             pill.className = 'btn-connect-pill connected';
-            if (pillText) pillText.textContent = 'Fusion 360 Bağlı';
+            if (pillText) pillText.textContent = swReady ? `${cadName} Bağlı` : `${cadName} Köprüsü Hazır`;
           }
           if (banner) banner.style.display = 'none';
           if (modalStatus) {
             modalStatus.className = 'modal-status-box connected';
-            modalStatus.innerHTML = '<span>🟢 <b>Fusion 360 Web Köprüsü Bağlı!</b> (127.0.0.1:49876) Tasarımlar Fusion ekranına anında çizilir.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Yenile</button>';
+            modalStatus.innerHTML = `<span>🟢 <b>${cadName} Web Köprüsü Bağlı!</b> (127.0.0.1:49876) Tasarımlar ${cadName} ekranına anında çizilir.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Yenile</button>`;
           }
           getCurrentDesignState().then(d => { if (d) updateWorkspaceStatusBadge(d); });
           return;
@@ -1490,15 +1554,19 @@
       if (wsBadge) wsBadge.style.display = 'none';
       if (pill) {
         pill.className = 'btn-connect-pill disconnected';
-        if (pillText) pillText.textContent = "Fusion'a Bağlan";
+        if (pillText) pillText.textContent = `${cadName}'a Bağlan`;
       }
       if (banner) {
         banner.style.display = 'block';
-        banner.innerHTML = `⚠️ <b>Fusion 360 Bağlantısı Aranıyor:</b> Web üzerinden çizilen modellerin Fusion 360 ekranına yansıması için <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:4px;">Fusion'a Bağlan &rarr;</a>`;
+        if (isSolidWorksTarget()) {
+          banner.innerHTML = `⚠️ <b>SolidWorks Köprüsü Aranıyor:</b> Klasördeki <code>baslat_solidworks.bat</code> (veya <code>py solidworks_server.py</code>) dosyasını çalıştırarak SolidWorks + Adam-CAD köprüsünü başlatın.`;
+        } else {
+          banner.innerHTML = `⚠️ <b>Fusion 360 Bağlantısı Aranıyor:</b> Web üzerinden çizilen modellerin Fusion 360 ekranına yansıması için <a href="javascript:void(0)" onclick="openConnectModal()" style="color:#00e5ff;font-weight:600;text-decoration:underline;margin-left:4px;">Fusion'a Bağlan &rarr;</a>`;
+        }
       }
       if (modalStatus) {
         modalStatus.className = 'modal-status-box disconnected';
-        modalStatus.innerHTML = '<span>🔴 <b>Fusion 360 Bekleniyor...</b> Fusion 360 ve AICADBridge açıldığında otomatik bağlanır.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Kontrol Et</button>';
+        modalStatus.innerHTML = `<span>🔴 <b>${cadName} Bekleniyor...</b> ${cadName} ve AICADBridge açıldığında otomatik bağlanır.</span><button class="btn-test-bridge" onclick="checkBridgeStatus()">🔄 Kontrol Et</button>`;
       }
     }
 
@@ -1539,12 +1607,12 @@
         const firstBody = design.bodies[0];
         const dims = firstBody?.dimensions_mm;
         const dimStr = dims ? `(${dims.width_x}x${dims.length_y}x${dims.height_z}mm)` : '';
-        text.innerHTML = `Model: <b>${design.bodies_count} Gövde</b> ${dimStr}`;
+        text.innerHTML = `${getCadLabel()}: <b>${design.bodies_count} Gövde</b> ${dimStr}`;
         badge.style.color = '#38bdf8';
         badge.style.borderColor = 'rgba(56,189,248,0.35)';
         badge.style.background = 'rgba(56,189,248,0.1)';
       } else {
-        text.textContent = 'Model: Çalışma Alanı Boş';
+        text.textContent = `${getCadLabel()}: Çalışma Alanı Boş`;
         badge.style.color = '#888';
         badge.style.borderColor = 'rgba(255,255,255,0.1)';
         badge.style.background = 'rgba(255,255,255,0.03)';
@@ -1556,16 +1624,17 @@
       if (text) text.textContent = 'Model taranıyor...';
       const design = await getCurrentDesignState();
       updateWorkspaceStatusBadge(design);
+      const cadName = getCadLabel();
 
       if (!design || !design.has_design) {
-        addMsg('ai', '<div class="status-badge error">❌ Fusion 360 aktif tasarımı okunamadı. Lütfen Fusion 360\'ta açık bir tasarım dokümanı olduğundan ve AICADBridge eklentisinin çalıştığından emin olun.</div>');
+        addMsg('ai', `<div class="status-badge error">❌ ${cadName} aktif tasarımı okunamadı. Lütfen ${cadName}'ta açık bir parça dokümanı olduğundan ve AICADBridge köprüsünün çalıştığından emin olun.</div>`);
         return;
       }
 
       let inspectHtml = '';
       if (design.bodies_count > 0) {
         inspectHtml = `
-          <div class="status-badge success" style="margin-bottom:8px;">📐 Fusion 360 Çalışma Alanı İncelendi</div>
+          <div class="status-badge success" style="margin-bottom:8px;">📐 ${cadName} Çalışma Alanı İncelendi</div>
           <div style="font-size:13px;color:#e2e8f0;line-height:1.55;">
             <b>Aktif Doküman:</b> ${esc(design.doc_name)}<br/>
             <b>Tespit Edilen Katı Gövde:</b> ${design.bodies_count} adet<br/>
@@ -1576,21 +1645,21 @@
             </ul>
             ${design.sketches_count > 0 ? `<div style="font-size:12px;color:#64748b;margin-bottom:6px;">Mevcut Eskizler: ${design.sketches.map(s => esc(s.name)).join(', ')}</div>` : ''}
             <div style="margin-top:10px;padding:9px 12px;background:rgba(0,184,212,0.1);border-left:3px solid #00e5ff;border-radius:4px;font-size:12.5px;color:#e0f2fe;">
-              💡 <i>Yapay zeka bu gövdeleri ve sınır ölçülerini hafızasına aldı. Şimdi bu modelin üzerine bir parça eklemek (örn. kanat, kapak, delik vb.) için doğrudan talimat verebilirsin!</i>
+              💡 <i>Yapay zeka bu gövdeleri ve sınır ölçülerini hafızasına aldı. Şimdi bu modelin üzerine bir parça eklemek (örn. flanş, kanat, delik vb.) için doğrudan talimat verebilirsin!</i>
             </div>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
               <button class="quick-chip" style="background:rgba(0,184,212,0.12);border-color:rgba(0,184,212,0.4);color:#00e5ff;font-weight:600;" onclick="sendQuick('Mevcut gövde üzerine sonraki adımı ekle')">
                 ➡️ Sonraki Adımı Ekle
               </button>
-              <button class="quick-chip" onclick="sendQuick('Mevcut modele uygun kanatları ekle')">
-                ✈️ Kanatları Ekle
+              <button class="quick-chip" onclick="sendQuick('Mevcut modele montaj delikleri ve pah ekle')">
+                🔩 Montaj Delikleri Ekle
               </button>
             </div>
           </div>
         `;
       } else {
         inspectHtml = `
-          <div class="status-badge" style="margin-bottom:8px;">📐 Fusion 360 Çalışma Alanı İncelendi</div>
+          <div class="status-badge" style="margin-bottom:8px;">📐 ${cadName} Çalışma Alanı İncelendi</div>
           <div style="font-size:13px;color:#e2e8f0;line-height:1.5;">
             <b>Aktif Doküman:</b> ${esc(design.doc_name)}<br/>
             Şu anda çalışma alanında katı bir gövde bulunmuyor (boş model).<br/>
@@ -1603,6 +1672,7 @@
 
     // ── Init ──
     document.addEventListener('DOMContentLoaded', () => {
+      applyCadTargetUI();
       checkBridgeStatus();
       setInterval(checkBridgeStatus, 3500);
       setGreeting();
@@ -3177,7 +3247,7 @@ The user will describe a 3D part. You must:
 1. Generate Fusion 360 Python API code with NAMED PARAMETER placeholders in the form __PARAM_NAME__ (all caps, underscores).
 2. Return a JSON object with this exact structure:
 {
-  "code": "import adsk.core, adsk.fusion, math\n# ... full fusion 360 python code with __PARAM_NAME__ placeholders ...",
+  "code": "import adsk.core, adsk.fusion, math\\n# ... full fusion 360 python code with __PARAM_NAME__ placeholders ...",
   "params": {
     "DIAMETER_MM": { "value": 40, "min": 5, "max": 200, "step": 1, "unit": "mm", "label": "Çap" },
     "HEIGHT_MM": { "value": 60, "min": 5, "max": 300, "step": 1, "unit": "mm", "label": "Yükseklik" }
@@ -3190,6 +3260,130 @@ Rules:
 - Parameters in code are in mm (user-facing); in the code multiply by 0.1 to get cm.
 - ONLY return valid JSON, no markdown, no explanation.`;
 
+    const SOLIDWORKS_PARAM_SYSTEM_PROMPT = `You are an Adam-CAD (CADAM) + SolidWorks parametric 3D CAD code generator.
+The user will describe a 3D part. You must:
+1. Generate SolidWorks Python code using the pre-injected \`sw\` (SolidWorksCADHelper) object with NAMED PARAMETER placeholders in the form __PARAM_NAME__ (all caps, underscores).
+2. Always start the code with \`sw.reset_part()\` so moving a slider cleanly rebuilds the part in SolidWorks!
+3. Return a JSON object with this exact structure:
+{
+  "code": "sw.reset_part()\\nsw.extrude_cylinder(__OUTER_DIA__, __THICKNESS__, plane='Top')\\nsw.cut_hole(__BORE_DIA__, __THICKNESS__, plane='Top')\\nsw.cut_bolt_circle(__BOLT_CIRCLE_DIA__, __BOLT_HOLE_DIA__, int(__BOLT_COUNT__), __THICKNESS__, plane='Top')\\nsw.rebuild()",
+  "params": {
+    "OUTER_DIA": { "value": 100, "min": 40, "max": 250, "step": 5, "unit": "mm", "label": "Dış Çap" },
+    "BORE_DIA": { "value": 36, "min": 10, "max": 120, "step": 2, "unit": "mm", "label": "Mil Delik Çapı" },
+    "THICKNESS": { "value": 16, "min": 5, "max": 60, "step": 1, "unit": "mm", "label": "Flanş Kalınlığı" },
+    "BOLT_CIRCLE_DIA": { "value": 72, "min": 30, "max": 200, "step": 2, "unit": "mm", "label": "Civata Dairesi (PCD)" },
+    "BOLT_HOLE_DIA": { "value": 10, "min": 4, "max": 24, "step": 1, "unit": "mm", "label": "Civata Delik Çapı" },
+    "BOLT_COUNT": { "value": 6, "min": 3, "max": 12, "step": 1, "unit": "adet", "label": "Civata Sayısı" }
+  }
+}
+Available \`sw\` methods (all dimensions in MILLIMETERS):
+- \`sw.reset_part()\` -> Clears existing bodies for clean parametric slider updates
+- \`sw.extrude_cylinder(diameter_mm, height_mm, x_mm=0, y_mm=0, plane='Top', merge=True)\`
+- \`sw.extrude_box(width_mm, length_mm, height_mm, cx_mm=0, cy_mm=0, plane='Top', merge=True)\`
+- \`sw.extrude_polygon(sides, diameter_mm, height_mm, cx_mm=0, cy_mm=0, plane='Top', merge=True)\`
+- \`sw.cut_hole(diameter_mm, depth_mm=1000, x_mm=0, y_mm=0, plane='Top')\`
+- \`sw.cut_bolt_circle(bolt_circle_dia_mm, hole_dia_mm, count, depth_mm=1000, cx_mm=0, cy_mm=0, plane='Top')\`
+- \`sw.cut_box(width_mm, length_mm, depth_mm, cx_mm=0, cy_mm=0, plane='Top')\`
+- \`sw.fillet_edges(radius_mm)\`
+- \`sw.chamfer_edges(distance_mm, angle_deg=45)\`
+- \`sw.shell_body(thickness_mm, remove_top_face=True)\`
+- \`sw.revolve_profile(points_mm_list, angle_deg=360, plane='Front', merge=True)\`
+- \`sw.rebuild()\`
+Rules:
+- ALL key dimensions must be parameters with __PARAM_NAME__ placeholders (unquoted numbers in Python code).
+- Always begin with \`sw.reset_part()\` and finish with \`sw.rebuild()\`.
+- ONLY return valid JSON, no markdown, no explanation.`;
+
+    const ADAMCAD_PRESETS = {
+      flange: {
+        prompt: '6 delikli parametrik mil bağlantı flanşı (göbekli)',
+        swCode: `sw.reset_part()
+sw.extrude_cylinder(__OUTER_DIA__, __FLANGE_THICK__, plane='Top', merge=False)
+sw.extrude_cylinder(__HUB_DIA__, __FLANGE_THICK__ + __HUB_HEIGHT__, plane='Top', merge=True)
+sw.cut_hole(__BORE_DIA__, __FLANGE_THICK__ + __HUB_HEIGHT__ + 10, plane='Top')
+sw.cut_bolt_circle(__PCD__, __BOLT_DIA__, int(__BOLT_COUNT__), __FLANGE_THICK__ + 5, plane='Top')
+sw.rebuild()`,
+        params: {
+          OUTER_DIA: { value: 120, min: 60, max: 260, step: 5, unit: 'mm', label: 'Flanş Dış Çapı' },
+          HUB_DIA: { value: 58, min: 30, max: 140, step: 2, unit: 'mm', label: 'Göbek Çapı' },
+          BORE_DIA: { value: 32, min: 10, max: 90, step: 2, unit: 'mm', label: 'Mil Deliği Çapı' },
+          FLANGE_THICK: { value: 14, min: 6, max: 40, step: 1, unit: 'mm', label: 'Flanş Kalınlığı' },
+          HUB_HEIGHT: { value: 22, min: 5, max: 60, step: 1, unit: 'mm', label: 'Göbek Yüksekliği' },
+          PCD: { value: 90, min: 45, max: 210, step: 2, unit: 'mm', label: 'Civata Dairesi (PCD)' },
+          BOLT_DIA: { value: 10, min: 4, max: 22, step: 1, unit: 'mm', label: 'Civata Delik Çapı' },
+          BOLT_COUNT: { value: 6, min: 3, max: 12, step: 1, unit: 'adet', label: 'Civata Sayısı' }
+        }
+      },
+      bracket: {
+        prompt: 'Montaj delikli L-tipi makine bağlantı braketi',
+        swCode: `sw.reset_part()
+sw.extrude_box(__WIDTH__, __BASE_LEN__, __THICK__, cx_mm=0, cy_mm=__BASE_LEN__/2.0, plane='Top', merge=False)
+sw.extrude_box(__WIDTH__, __THICK__, __VERT_HEIGHT__, cx_mm=0, cy_mm=__THICK__/2.0, plane='Top', merge=True)
+sw.cut_hole(__HOLE_DIA__, __THICK__ + 10, x_mm=-__WIDTH__/4.0, y_mm=__BASE_LEN__*0.65, plane='Top')
+sw.cut_hole(__HOLE_DIA__, __THICK__ + 10, x_mm=__WIDTH__/4.0, y_mm=__BASE_LEN__*0.65, plane='Top')
+sw.rebuild()`,
+        params: {
+          WIDTH: { value: 70, min: 30, max: 180, step: 5, unit: 'mm', label: 'Braket Genişliği' },
+          BASE_LEN: { value: 95, min: 40, max: 220, step: 5, unit: 'mm', label: 'Taban Uzunluğu' },
+          VERT_HEIGHT: { value: 80, min: 30, max: 200, step: 5, unit: 'mm', label: 'Dikey Kol Yüksekliği' },
+          THICK: { value: 12, min: 4, max: 30, step: 1, unit: 'mm', label: 'Et Kalınlığı' },
+          HOLE_DIA: { value: 10, min: 4, max: 24, step: 1, unit: 'mm', label: 'Montaj Deliği Çapı' }
+        }
+      },
+      gear: {
+        prompt: 'Parametrik altıgen göbekli kasnak / çark gövdesi',
+        swCode: `sw.reset_part()
+sw.extrude_cylinder(__OUTER_DIA__, __WIDTH__, plane='Top', merge=False)
+sw.extrude_polygon(int(__SIDES__), __HUB_DIA__, __WIDTH__ + __HUB_EXT__, plane='Top', merge=True)
+sw.cut_hole(__SHAFT_DIA__, __WIDTH__ + __HUB_EXT__ + 10, plane='Top')
+sw.cut_bolt_circle(__LIGHT_PCD__, __LIGHT_HOLE__, int(__LIGHT_COUNT__), __WIDTH__ + 5, plane='Top')
+sw.rebuild()`,
+        params: {
+          OUTER_DIA: { value: 110, min: 50, max: 240, step: 5, unit: 'mm', label: 'Dış Çap' },
+          WIDTH: { value: 20, min: 8, max: 60, step: 2, unit: 'mm', label: 'Gövde Kalınlığı' },
+          HUB_DIA: { value: 46, min: 24, max: 100, step: 2, unit: 'mm', label: 'Poligon Göbek Çapı' },
+          HUB_EXT: { value: 10, min: 2, max: 40, step: 2, unit: 'mm', label: 'Göbek Çıkıntısı' },
+          SIDES: { value: 6, min: 4, max: 12, step: 1, unit: 'kenar', label: 'Göbek Kenar Sayısı' },
+          SHAFT_DIA: { value: 22, min: 8, max: 50, step: 1, unit: 'mm', label: 'Mil Çapı' },
+          LIGHT_PCD: { value: 76, min: 35, max: 170, step: 2, unit: 'mm', label: 'Hafifletme PCD' },
+          LIGHT_HOLE: { value: 14, min: 6, max: 32, step: 1, unit: 'mm', label: 'Hafifletme Delik Çapı' },
+          LIGHT_COUNT: { value: 6, min: 3, max: 10, step: 1, unit: 'adet', label: 'Hafifletme Delik Sayısı' }
+        }
+      },
+      enclosure: {
+        prompt: 'Parametrik içi boşaltılmış elektronik muhafaza kutusu',
+        swCode: `sw.reset_part()
+sw.extrude_box(__BOX_W__, __BOX_L__, __BOX_H__, plane='Top', merge=False)
+sw.cut_box(__BOX_W__ - 2*__WALL__, __BOX_L__ - 2*__WALL__, __BOX_H__ - __WALL__, plane='Top')
+sw.rebuild()`,
+        params: {
+          BOX_W: { value: 110, min: 40, max: 260, step: 5, unit: 'mm', label: 'Kutu Genişliği (X)' },
+          BOX_L: { value: 75, min: 30, max: 220, step: 5, unit: 'mm', label: 'Kutu Uzunluğu (Y)' },
+          BOX_H: { value: 45, min: 15, max: 150, step: 5, unit: 'mm', label: 'Kutu Yüksekliği (Z)' },
+          WALL: { value: 4, min: 2, max: 15, step: 1, unit: 'mm', label: 'Duvar Kalınlığı' }
+        }
+      }
+    };
+
+    async function applyParamPreset(presetKey) {
+      const preset = ADAMCAD_PRESETS[presetKey];
+      if (!preset) return;
+      const inputEl = document.getElementById('paramPrompt');
+      if (inputEl) inputEl.value = preset.prompt;
+
+      if (isSolidWorksTarget()) {
+        paramState.baseCode = preset.swCode;
+        paramState.params = {};
+        Object.entries(preset.params).forEach(([k, v]) => {
+          paramState.params[k] = { ...v, currentValue: v.value };
+        });
+        renderParamSliders();
+        await applyParamCode();
+      } else {
+        await generateParametric();
+      }
+    }
+
     async function generateParametric() {
       const prompt = document.getElementById('paramPrompt')?.value?.trim();
       if (!prompt) return;
@@ -3200,22 +3394,28 @@ Rules:
       const activeBaseUrl = isLocalMode ? (state.localBaseUrl || localStorage.getItem('aicad_local_base_url') || 'http://localhost:1234/v1') : null;
 
       if (!activeModel && !isLocalMode) {
-        setParamStatus('❌ Önce Ayarlar\'dan bir model seçin.', 'error');
+        setParamStatus('❌ Önce Ayarlar\'dan bir model seçin (veya üstteki hazır Adam-CAD şablonlarından birine tıklayın).', 'error');
         return;
       }
 
       const btn = document.getElementById('btnParamGen');
       if (btn) btn.disabled = true;
       paramState.isGenerating = true;
-      setParamStatus('🧠 Parametrik yapı analiz ediliyor...', 'running');
+      setParamStatus(`🧠 ${getCadLabel()} + Adam-CAD parametrik yapı analiz ediliyor...`, 'running');
 
       try {
-        // Build message for parametric generation
+        const isSw = isSolidWorksTarget();
         const messages = [
-          { role: 'user', text: `Parametrik Fusion 360 kodu oluştur: ${prompt}` }
+          {
+            role: 'user',
+            text: isSw
+              ? `Parametrik SolidWorks (sw helper) + Adam-CAD JSON kodu oluştur: ${prompt}`
+              : `Parametrik Fusion 360 kodu oluştur: ${prompt}`
+          }
         ];
 
-        const raw = await callLLM(activeProvider, activeModel, messages, activeApiKey, null, activeBaseUrl);
+        const sysPrompt = isSw ? SOLIDWORKS_PARAM_SYSTEM_PROMPT : PARAM_SYSTEM_PROMPT;
+        const raw = await callLLM(activeProvider, activeModel, messages, activeApiKey, null, activeBaseUrl, sysPrompt);
 
         // Try to parse JSON from response
         let parsed = null;
@@ -3244,7 +3444,7 @@ Rules:
 
         renderParamSliders();
         await applyParamCode();
-        setParamStatus('✅ Parametrik model oluşturuldu! Sliderları kaydırarak anlık değiştir.', 'success');
+        setParamStatus(`✅ ${getCadLabel()} parametrik modeli oluşturuldu! Sliderları kaydırarak anlık değiştir.`, 'success');
 
       } catch(err) {
         setParamStatus(`❌ Hata: ${err.message}`, 'error');
@@ -3294,13 +3494,14 @@ Rules:
         const regex = new RegExp('__' + key + '__', 'g');
         code = code.replace(regex, p.currentValue);
       });
-      setParamStatus('⚙️ Fusion 360\'a gönderiliyor...', 'running');
+      const cadName = getCadLabel();
+      setParamStatus(`⚙️ ${cadName}'a gönderiliyor...`, 'running');
       const res = await sendToFusionAsync('executeCADCode', { code });
       if (res?.success) {
-        setParamStatus('✅ Güncellendi.', 'success');
+        setParamStatus(`✅ ${cadName} üzerinde anlık güncellendi.`, 'success');
         getCurrentDesignState().then(st => updateWorkspaceStatusBadge(st)).catch(() => {});
       } else if (res?.devMode) {
-        setParamStatus('⚠️ Fusion 360 bağlı değil. Kodu üretildi ama çalıştırılamadı.', 'error');
+        setParamStatus(`⚠️ ${cadName} bağlı değil. Kodu üretildi ama çalıştırılamadı.`, 'error');
       } else {
         setParamStatus(`❌ ${res?.error || 'Çizim hatası'}`, 'error');
       }
@@ -3316,6 +3517,41 @@ Rules:
 
 
     // ── CAD Code Generation & Conversational Engine ──
+
+    const SOLIDWORKS_SYSTEM_PROMPT = `You are "AI CAD Studio (SolidWorks + Adam-CAD Edition)", an autonomous SolidWorks 3D Modeling Engineer and Parametric Copilot.
+You converse fluently and naturally in Turkish (or the user's language).
+
+CRITICAL ARCHITECTURAL RULES:
+1. THE USER DOES NOT RUN SCRIPTS - NEVER OUTPUT EXECUTION INSTRUCTIONS:
+   - Our system automatically extracts your Python code and executes it directly inside SolidWorks via the COM API bridge!
+   - NEVER write "Nasıl Çalıştırılır?", "Makro çalıştır", or copy-paste instructions.
+2. DESIGN BRIEF & COMPLETE MODELING:
+   - Begin with a concise TASARIM PLANI (Amaç, Parça Listesi ve mm ölçüleri).
+   - If the user gives a clear command ("flanş çiz", "masa yap", "dişli gövdesi çiz", "devam et"), immediately generate the complete 3D Python code inside a \`\`\`python ... \`\`\` block!
+3. SOLIDWORKS PYTHON API & \`sw\` (SolidWorksCADHelper) CRITICAL RULES:
+   - Pre-injected objects in your execution scope:
+     * \`sw\` (or \`cad\`): High-level \`SolidWorksCADHelper\` — **ALL DIMENSIONS IN MILLIMETERS (mm)**!
+     * \`sw_app\`: Raw \`SldWorks.Application\` COM object
+     * \`model\`: Active \`IModelDoc2\` (Part document) — **raw COM methods use METERS (m)**!
+     * \`fm\`: \`model.FeatureManager\`, \`sm\`: \`model.SketchManager\`, \`ext\`: \`model.Extension\`
+   - ALWAYS prefer the \`sw\` helper methods (in millimeters) for 100% reliable 3D solid modeling:
+     * \`sw.extrude_cylinder(diameter_mm, height_mm, x_mm=0.0, y_mm=0.0, plane='Top', merge=True)\`
+     * \`sw.extrude_box(width_mm, length_mm, height_mm, cx_mm=0.0, cy_mm=0.0, plane='Top', merge=True)\`
+     * \`sw.extrude_polygon(sides, diameter_mm, height_mm, cx_mm=0.0, cy_mm=0.0, plane='Top', merge=True)\`
+     * \`sw.cut_hole(diameter_mm, depth_mm=1000.0, x_mm=0.0, y_mm=0.0, plane='Top')\`
+     * \`sw.cut_bolt_circle(bolt_circle_dia_mm, hole_dia_mm, count, depth_mm=1000.0, cx_mm=0.0, cy_mm=0.0, plane='Top')\`
+     * \`sw.cut_box(width_mm, length_mm, depth_mm, cx_mm=0.0, cy_mm=0.0, plane='Top')\`
+     * \`sw.fillet_edges(radius_mm)\`
+     * \`sw.chamfer_edges(distance_mm, angle_deg=45.0)\`
+     * \`sw.shell_body(thickness_mm, remove_top_face=True)\`
+     * \`sw.revolve_profile(points_mm_list, angle_deg=360.0, plane='Front', merge=True)\`
+     * \`sw.define_parameter(name, value_mm)\`
+     * \`sw.rebuild()\`
+   - NEVER import \`adsk.core\` or \`adsk.fusion\` when modeling for SolidWorks!
+   - Finish every script with \`sw.rebuild()\`.
+4. DYNAMIC SUGGESTIONS:
+   - End every reply with 2-3 relevant next-step suggestions:
+     [ÖNERİLER: Öneri 1 | Öneri 2 | Öneri 3]`;
 
     const SYSTEM_PROMPT = `You are "AI CAD Studio", an autonomous Autodesk Fusion 360 3D Modeling Engineer and Copilot.
 You converse fluently and naturally in Turkish (or the user's language).
@@ -3419,6 +3655,10 @@ CRITICAL ARCHITECTURAL RULES:
      sonra delik ve kesmeler (hole/cut), en son yüzey işlemleri (fillet/chamfer)
      ve çoğaltmalar (pattern/mirror).`;
 
+    function getActiveSystemPrompt() {
+      return isSolidWorksTarget() ? SOLIDWORKS_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    }
+
     function cleanExplanationText(text) {
       if (!text) return '';
       let cleaned = text;
@@ -3504,7 +3744,7 @@ CRITICAL ARCHITECTURAL RULES:
     }
 
     async function callLLM(provider, model, history, apiKey, healingInfo = null, baseUrl = null, systemPromptOverride = null) {
-      const activeSystemPrompt = systemPromptOverride || SYSTEM_PROMPT;
+      const activeSystemPrompt = systemPromptOverride || getActiveSystemPrompt();
       if (provider === 'google') {
         const contents = [];
         for (const turn of history) {
@@ -3733,7 +3973,8 @@ CRITICAL ARCHITECTURAL RULES:
 
       while (!execRes?.success && !execRes?.devMode && attempts < MAX_HEALING_ATTEMPTS) {
         attempts++;
-        const errMsg = execRes?.error || 'Bilinmeyen Fusion 360 API hatası';
+        const cadName = getCadLabel();
+        const errMsg = execRes?.error || `Bilinmeyen ${cadName} API hatası`;
         const errTb = execRes?.traceback || '';
 
         if (opts.onStatus) opts.onStatus('healing', errMsg, attempts, MAX_HEALING_ATTEMPTS);
@@ -3742,6 +3983,8 @@ CRITICAL ARCHITECTURAL RULES:
         let specificTip = '';
         if (errMsg.includes('SÖZDİZİMİ HATASI')) {
           specificTip = "ÖNEMLİ İPUCU: Kod Python sözdizimi hatası veriyor (ast.parse kontrolü). Girintileri, parantezleri ve satır sonlarını kontrol et.\n";
+        } else if (isSolidWorksTarget()) {
+          specificTip = "ÖNEMLİ İPUCU: SolidWorks için `adsk` import ETME! Hazır `sw` (SolidWorksCADHelper) nesnesinin milimetre tabanlı metodlarını (`sw.extrude_cylinder`, `sw.extrude_box`, `sw.cut_hole`, `sw.cut_bolt_circle`, `sw.fillet_edges`, `sw.chamfer_edges`, `sw.rebuild`) kullan.\n";
         } else if (errMsg.includes('HİÇBİR YENİ 3D KATI GÖVDE EKLENMEDİ') || errMsg.includes('No bodies added')) {
           specificTip = "ÖNEMLİ İPUCU: Çizim sadece 2D eskiz olarak kaldı! Mutlaka kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile 3D katı gövdeye dönüştür.\n";
         } else if (errMsg.includes('Kesilecek veya kesişecek hedef gövde bulunamadı')) {
@@ -3750,7 +3993,7 @@ CRITICAL ARCHITECTURAL RULES:
           specificTip = "ÖNEMLİ İPUCU: Eskiz profili kapalı değil veya bulunamadı! Çizgilerin uç uca tam kapandığından emin ol ya da sketch.profiles.count kontrolü yap.\n";
         }
 
-        const healingPrompt = `Fusion 360 API şu hatayı verdi (${attempts}. deneme):\n${errMsg}\n\nDetaylı Traceback:\n${errTb}\n\n${specificTip}Lütfen hatanın nedenini gidererek eksiksiz, çalışan Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğunda tekrar üret. Sadece saf Python kodu döndür.`;
+        const healingPrompt = `${cadName} API şu hatayı verdi (${attempts}. deneme):\n${errMsg}\n\nDetaylı Traceback:\n${errTb}\n\n${specificTip}Lütfen hatanın nedenini gidererek eksiksiz, çalışan ${cadName} Python kodunu \`\`\`python ... \`\`\` bloğunda tekrar üret. Sadece saf Python kodu döndür.`;
 
         let rawHealingReply = '';
         try {
@@ -3834,8 +4077,8 @@ CRITICAL ARCHITECTURAL RULES:
 
     // Vision destekli sağlayıcılarla viewport görüntüsünü modele gösterip komutla karşılaştırır
     async function callVisionCheck(provider, model, apiKey, baseUrl, imageDataUrl, command) {
-      const sysPrompt = 'You are a CAD QA inspector for Fusion 360 models. Compare the viewport screenshot with the user command. Reply ONLY with JSON: {"ok": true|false, "issues": "kısa Türkçe açıklama (eksik/uyumsuz neyse)"}';
-      const question = `Kullanıcı komutu: "${command}"\nEkteki Fusion 360 viewport görüntüsündeki 3D model bu komuta uyuyor mu? Eksik detay var mı? SADECE JSON döndür.`;
+      const sysPrompt = 'You are a CAD QA inspector for 3D CAD models. Compare the viewport screenshot with the user command. Reply ONLY with JSON: {"ok": true|false, "issues": "kısa Türkçe açıklama (eksik/uyumsuz neyse)"}';
+      const question = `Kullanıcı komutu: "${command}"\nEkteki ${getCadLabel()} viewport görüntüsündeki 3D model bu komuta uyuyor mu? Eksik detay var mı? SADECE JSON döndür.`;
       const b64 = (imageDataUrl.split(',')[1] || '');
       try {
         if (provider === 'google') {
@@ -3922,7 +4165,7 @@ CRITICAL ARCHITECTURAL RULES:
         html += `<div style="font-size:11.5px;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(56,189,248,0.08);padding:4px 9px;border-radius:6px;border:1px solid rgba(56,189,248,0.2);"><span>📐</span><span>Mevcut model okundu (<b>${designState.bodies_count} gövde</b> referans alındı)</span></div>`;
       }
       const paramCount = (plan.parameters || []).length;
-      html += `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📋 <b>Modelleme Planı</b> — ${plan.features.length} adım${paramCount ? ` · ${paramCount} parametre` : ''}:</div>`;
+      html += `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📋 <b>Modelleme Planı (${getCadLabel()})</b> — ${plan.features.length} adım${paramCount ? ` · ${paramCount} parametre` : ''}:</div>`;
       html += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">`;
       plan.features.forEach((f, i) => {
         html += `
@@ -3937,7 +4180,7 @@ CRITICAL ARCHITECTURAL RULES:
       });
       html += `</div>`;
       html += `<div id="pipelineStatusLines" style="display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:#9aa6b2;margin-bottom:6px;"></div>`;
-      html += `<div class="status-badge loading" id="pipelineFinalStatus">⚙️ Adımlar Fusion 360 içinde uygulanıyor...</div>`;
+      html += `<div class="status-badge loading" id="pipelineFinalStatus">⚙️ Adımlar ${getCadLabel()} içinde uygulanıyor...</div>`;
       html += `
         <div style="margin-top:6px;">
           <span style="font-size:10.5px;color:#555;cursor:pointer;user-select:none;" onclick="const el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.textContent=el.style.display==='none'?'[+ Teknik Kod]':'[- Teknik Kodu Gizle]';">[+ Teknik Kod]</span>
@@ -4087,7 +4330,7 @@ CRITICAL ARCHITECTURAL RULES:
           setPipelineStep(i, 'done');
           return { ok: true, execRes };
         }
-        setPipelineStep(i, 'failed', execRes && execRes.devMode ? 'Fusion bağlı değil' : formatFusionErrorInTurkish((execRes && execRes.error) || 'Bilinmeyen hata'));
+        setPipelineStep(i, 'failed', execRes && execRes.devMode ? `${getCadLabel()} bağlı değil` : formatFusionErrorInTurkish((execRes && execRes.error) || 'Bilinmeyen hata'));
         return { ok: false, execRes };
       };
 
@@ -4103,7 +4346,7 @@ CRITICAL ARCHITECTURAL RULES:
         }
         const r = await runFeatureCoding(i, cp);
         if (r.execRes && r.execRes.devMode) {
-          setPipelineFinal('error', `⚠️ <b>Fusion 360 bağlı değil:</b> adımlar uygulanamadı. Üretilen kodlar [+ Teknik Kod] bölümünde.`);
+          setPipelineFinal('error', `⚠️ <b>${getCadLabel()} bağlı değil:</b> adımlar uygulanamadı. Üretilen kodlar [+ Teknik Kod] bölümünde.`);
           finishPipelineHistory(plan, featureCodes);
           return true;
         }
@@ -4177,7 +4420,7 @@ CRITICAL ARCHITECTURAL RULES:
 
       // 7) Final durum
       if (verify.ok) {
-        setPipelineFinal('success', `✅ <b>Model doğrulanarak oluşturuldu!</b> <span style="font-weight:400">${esc(verify.metrics || '')}</span>`);
+        setPipelineFinal('success', `✅ <b>Model ${getCadLabel()} üzerinde doğrulanarak oluşturuldu!</b> <span style="font-weight:400">${esc(verify.metrics || '')}</span>`);
       } else {
         setPipelineFinal('healing', `⚠️ <b>Model oluşturuldu ancak doğrulama uyarısı sürüyor</b> (${tours}/2 tur): ${esc(((verify.issues[0] || {}).text) || '')}`);
       }
@@ -4234,7 +4477,7 @@ CRITICAL ARCHITECTURAL RULES:
       }
       addMsg('user', userMsgHtml);
 
-      // Active Fusion 360 design state inspection
+      // Active CAD design state inspection
       let designState = null;
       try {
         designState = await getCurrentDesignState();
@@ -4243,6 +4486,7 @@ CRITICAL ARCHITECTURAL RULES:
         console.warn('Tasarım durumu okunamadı:', e);
       }
 
+      const cadName = getCadLabel();
       const isContinuation = /devam|sonraki|sıradak|ilerle|kaldığın|tamam|ekle|yap|bitir|ayrıntı|çiz|oluştur/i.test(prompt);
       const isComplaint = /tasarım yapmıyor|çizmiyor|model nerede|görünmüyor|eklenmedi|yapmıyor|çizmedi/i.test(prompt);
       let effectivePrompt = prompt || (currentImages.length > 0 ? 'Bu görseli referans alarak incele ve tasarım için yol göster veya modelle.' : 'Ekleri incele ve tasarım için yol göster veya modelle.');
@@ -4251,15 +4495,14 @@ CRITICAL ARCHITECTURAL RULES:
       });
 
       if (designState && designState.has_design && designState.bodies_count > 0) {
-        effectivePrompt = `${effectivePrompt}\n\n[MEVCUT FUSION 360 TASARIM DURUMU]:\n${designState.summary_text}\n(Lütfen yeni eklenecek parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır, NewBodyFeatureOperation kullan ve gövdeleri kesmeye/birleştirmeye çalışma)`;
+        effectivePrompt = `${effectivePrompt}\n\n[MEVCUT ${cadName.toUpperCase()} TASARIM DURUMU]:\n${designState.summary_text}\n(Lütfen yeni eklenecek parçayı bu mevcut katı gövdelere uygun koordinatlarda konumlandır.)`;
       }
 
       if ((isContinuation || isComplaint) && designState && designState.has_design && designState.bodies_count > 0) {
         effectivePrompt += `\n\n[KESİNTİSİZ ADIM ADIM MODELLEME TALİMATI]:
-Kullanıcı tasarıma devam etmeni ve Fusion 360 ekranında somut 3D parçayı hemen oluşturmanı istiyor!
+Kullanıcı tasarıma devam etmeni ve ${cadName} ekranında somut 3D parçayı hemen oluşturmanı istiyor!
 KESİNLİKLE soru sorma, 'şunu mu yapalım bunu mu' gibi seçenek sunup bekleme!
-Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat altı jet motorları, gövde üstü kokpit kanopisi, dikey kuyruk kanatçığı) kendin belirleyerek DOĞRUDAN Fusion 360 Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret!
-ÖNEMLİ ZORUNLULUK: Kodun sonunda çizdiğin kapalı profili 'extrudes.add(extInput)' ve 'NewBodyFeatureOperation' ile mutlaka 3D katı gövdeye dönüştür! Sadece 2D eskiz çizip bırakma, böylece kullanıcı ekranda parçayı hemen 3D olarak görsün!`;
+Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı kendin belirleyerek DOĞRUDAN ${cadName} Python kodunu \`\`\`python ... \`\`\` bloğu içinde üret!`;
       }
 
       // Add to conversation history
@@ -4351,7 +4594,7 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
         }
 
         aiMsgHtml += `
-          <div class="status-badge loading" id="activeCadStatus">⚙️ Fusion 360 içinde model oluşturuluyor...</div>
+          <div class="status-badge loading" id="activeCadStatus">⚙️ ${cadName} içinde model oluşturuluyor...</div>
           <div style="margin-top:6px;">
             <span style="font-size:10.5px;color:#555;cursor:pointer;user-select:none;" onclick="const el=this.nextElementSibling; el.style.display=el.style.display==='none'?'block':'none'; this.textContent=el.style.display==='none'?'[+ Teknik Kod]':'[- Teknik Kodu Gizle]';">[+ Teknik Kod]</span>
             <pre style="display:none;margin-top:4px;padding:8px 10px;font-size:11px;background:#090d13;border:1px solid #1a2230;border-radius:6px;color:#8b949e;overflow-x:auto;max-height:180px;"><code id="cadCodeBlock">${esc(currentCode)}</code></pre>
@@ -4368,7 +4611,7 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
         conversationHistory.push({ role: 'assistant', text: rawReply });
         saveCurrentConversation(); // Konuşmayı localStorage'a kaydet
 
-        // Fusion 360 içinde kodu yürüt
+        // CAD içinde kodu yürüt
         let execRes = await sendToFusionAsync('executeCADCode', { code: currentCode });
         const statusEl = aiMsgElem.querySelector('#activeCadStatus');
         const checkInEl = aiMsgElem.querySelector('#checkInBarContainer');
@@ -4393,7 +4636,7 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
               statusEl.innerHTML = `🔧 <b>Sorun tespit edildi (${att}/${maxAtt}):</b> ${esc(fusionErrTr)}<br/><span style="font-size:11.5px;opacity:0.9">Yapay zeka sorunu gidermek için kodu onarıyor...</span>`;
             } else {
               statusEl.className = 'status-badge loading';
-              statusEl.innerHTML = `⚙️ Onarılan kod Fusion 360 içinde test ediliyor (${att}/${maxAtt})...`;
+              statusEl.innerHTML = `⚙️ Onarılan kod ${cadName} içinde test ediliyor (${att}/${maxAtt})...`;
             }
           },
           onCode: (c) => {
@@ -4413,7 +4656,7 @@ Mevcut modeldeki gövdeleri incele ve sıradaki eksik parçayı (örneğin kanat
             const addedBodies = (execRes.new_bodies && execRes.new_bodies.length > 0)
               ? ` (${execRes.new_bodies.join(', ')} eklendi)`
               : '';
-            statusEl.innerHTML = `✅ Model Fusion 360 çalışma alanına başarıyla eklendi!${esc(addedBodies)}`;
+            statusEl.innerHTML = `✅ Model ${cadName} çalışma alanına başarıyla eklendi!${esc(addedBodies)}`;
           }
           if (checkInEl) {
             checkInEl.style.display = 'block';
